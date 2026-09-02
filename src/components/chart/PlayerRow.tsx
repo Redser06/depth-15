@@ -137,24 +137,25 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
             <div className="flex items-center gap-1 shrink-0 mt-0.5">
               <div
                 {...dragHandleProps}
-                className="touch-none cursor-grab active:cursor-grabbing p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="touch-none cursor-grab active:cursor-grabbing p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 active:text-[#0D6938]"
                 title="Drag to reorder ladder"
               >
                 <GripVertical className="w-4 h-4" />
               </div>
 
               {(canMoveUp || canMoveDown) && (
-                <div className="flex flex-col">
+                <div className="flex flex-col gap-0.5">
                   {canMoveUp && onMoveUp && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onMoveUp();
                       }}
-                      className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-0.5"
+                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 p-1 sm:p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition active:scale-90 touch-manipulation"
                       title="Move up rank"
+                      aria-label="Move player up"
                     >
-                      <ChevronUp className="w-3 h-3" />
+                      <ChevronUp className="w-3.5 h-3.5" />
                     </button>
                   )}
                   {canMoveDown && onMoveDown && (
@@ -163,10 +164,11 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
                         e.stopPropagation();
                         onMoveDown();
                       }}
-                      className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-0.5"
+                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 p-1 sm:p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition active:scale-90 touch-manipulation"
                       title="Move down rank"
+                      aria-label="Move player down"
                     >
-                      <ChevronDown className="w-3 h-3" />
+                      <ChevronDown className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>

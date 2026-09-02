@@ -95,20 +95,20 @@ export const SelectionConflictBanner: React.FC<SelectionConflictBannerProps> = (
                     }`}
                   >
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-6 h-6 rounded-md bg-[#0F1E36] dark:bg-slate-800 text-white font-bold text-xs flex items-center justify-center font-mono">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="w-6 h-6 rounded-md bg-[#0F1E36] dark:bg-slate-800 text-white font-bold text-xs flex items-center justify-center font-mono shrink-0">
                             {pos.posId}
                           </span>
-                          <span className="font-extrabold text-sm text-slate-900 dark:text-white">
+                          <span className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
                             Starts at {pos.posName}
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                           {isOptimal && (
                             <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300">
-                              <Sparkles className="w-3 h-3" /> Max Combined ({pairedOption?.combinedScore})
+                              <Sparkles className="w-3 h-3" /> Max ({pairedOption?.combinedScore})
                             </span>
                           )}
                           <span className="font-mono font-black text-sm text-[#0D6938] dark:text-emerald-400">
@@ -119,21 +119,21 @@ export const SelectionConflictBanner: React.FC<SelectionConflictBannerProps> = (
 
                       {/* Drop-off & Pair Analysis */}
                       {pairedOption && (
-                        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-850 text-xs space-y-1">
-                          <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
-                            <span className="font-medium">Vacated Position Cover:</span>
+                        <div className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-850 text-xs space-y-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-1 text-slate-600 dark:text-slate-300">
+                            <span className="font-medium">Vacated Cover:</span>
                             <span className="font-bold text-slate-900 dark:text-white">
                               {pairedOption.backupStarterName} ({pairedOption.backupStarterRating})
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] text-slate-500">
-                            <span>Backup Drop-off Gap:</span>
+                          <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500">
+                            <span>Drop-off Gap:</span>
                             <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
                               -{pairedOption.backupDropoff} pts at {pairedOption.alternativePosName}
                             </span>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-1 mt-1">
-                            <span className="font-semibold text-slate-700 dark:text-slate-300">Net Starter Pair:</span>
+                          <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-1 mt-1">
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">Net Pair:</span>
                             <span className="font-mono font-black text-slate-900 dark:text-white">
                               {pos.rating} + {pairedOption.backupStarterRating} = {pairedOption.combinedScore}
                             </span>

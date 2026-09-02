@@ -61,8 +61,8 @@ export const Navigation: React.FC<NavigationProps> = ({
   ];
 
   return (
-    <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 sticky top-[57px] z-20 shadow-xs">
-      <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto no-scrollbar py-2">
+    <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-2 sm:px-6 sticky top-[57px] z-20 shadow-xs w-full max-w-full overflow-hidden">
+      <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto no-scrollbar py-2 touch-pan-x overscroll-x-contain">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;

@@ -58,15 +58,17 @@
    - Enforces the core rule: **A player cannot be #1 starter in 2 positions simultaneously**.
    - Automatically computes the opportunity cost of playing a star in one position versus another based on the replacement drop-off gap to the backup (e.g. Tadhg Beirne at 5 Lock vs 6 Blindside Flanker).
 
-8. **Touch-First Drag-to-Rank Ladder UX**
-   - Native mobile touch drag (`@dnd-kit` with `TouchSensor` [100ms activation delay] & `PointerSensor`) alongside one-tap precision up/down stepper arrows.
+8. **Touch-First Drag-to-Rank Ladder UX & Mobile Ergonomics**
+   - Native mobile touch drag (`@dnd-kit` with `TouchSensor` [100ms activation delay, 5px tolerance] & `PointerSensor`) alongside one-tap precision up/down stepper arrows (`touch-manipulation`, expanded touch targets).
+   - Zero horizontal overflow (`scrollWidth === clientWidth`) across 360px–390px mobile viewports (iPhone SE/14/15, Galaxy S-series).
+   - Tactical broadcast pitch with calibrated mobile vertical aspect ratio (`paddingBottom: '142%'`) and responsive plaques ensuring zero node overlap.
 
 9. **Consensus Mathematics & Typed Domain Effects**
    - Strict 1:1 mathematical vote aggregation (exactly one entry per voter, zero double-counting, zero phantom votes).
    - Passed proposals apply verified state mutations (retirements set status to `retired` and purge starter assignments; re-rates update spread; additions insert contenders).
 
 10. **Automated CI/CD Pipeline (GitHub Actions)**
-    - **Pull Request CI (`preview.yml`)**: Runs typechecks, 43 Vitest tests, builds, and provisions a 7-day Firebase preview channel.
+    - **Pull Request CI (`preview.yml`)**: Runs typechecks, 47 Vitest tests, builds, and provisions a 7-day Firebase preview channel.
     - **Production CD (`deploy-production.yml`)**: Automatically tests, builds, and deploys merges to `main` straight to `https://depth-15.web.app`.
 
 ---
@@ -77,7 +79,7 @@
 - **Framework:** React 18 + TypeScript + Vite
 - **Styling:** Tailwind CSS + Lucide Icons + Canvas Confetti
 - **Gestures:** `@dnd-kit/core` & `@dnd-kit/sortable` (Touch & Pointer Sensors)
-- **Testing:** Vitest + React Testing Library + JSDOM (43 tests: selection engine, 1:1 consensus math, adversarial probes, vacated ladders, honest radar data-integrity probe, card-matches-maths integration)
+- **Testing:** Vitest + React Testing Library + JSDOM (47 tests: selection engine, 1:1 consensus math, adversarial probes, vacated ladders, honest radar data-integrity probe, card-matches-maths integration, mobile ergonomics & boundary invariants)
 - **CI/CD:** GitHub Actions + Firebase Extended Hosting Action
 - **Hosting:** Firebase Hosting Multi-site (`depth-15`)
 
@@ -85,7 +87,7 @@
 # Development server
 npm run dev
 
-# Run Vitest test suite (43 tests)
+# Run Vitest test suite (47 tests)
 npm test
 
 # Typecheck and build

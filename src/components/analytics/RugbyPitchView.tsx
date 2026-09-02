@@ -69,7 +69,7 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
           <div
             className="w-full relative select-none"
             style={{
-              paddingBottom: '125%', // 4:5 authentic pitch aspect ratio
+              paddingBottom: '142%', // 142% on mobile gives vertical breathing room for tactical nodes
               background: 'repeating-linear-gradient(0deg, #104C28 0px, #104C28 40px, #0D4222 40px, #0D4222 80px)',
             }}
           >
@@ -168,7 +168,7 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
                   >
                     {/* Jersey / Circle Shield Node */}
                     <div
-                      className={`relative w-11 h-11 sm:w-13 sm:h-13 rounded-2xl flex flex-col items-center justify-center font-bold text-white shadow-lg transition-all border-2 ${
+                      className={`relative w-10 h-10 sm:w-13 sm:h-13 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center font-bold text-white shadow-lg transition-all border-2 ${
                         isSelected
                           ? 'ring-4 ring-amber-400 border-white bg-slate-950 scale-105'
                           : isVacant
@@ -184,7 +184,7 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
                       </span>
 
                       {/* Starter Rating */}
-                      <span className={`text-[10px] sm:text-[11px] font-extrabold font-mono mt-0.5 leading-none ${
+                      <span className={`text-[9px] sm:text-[11px] font-extrabold font-mono mt-0.5 leading-none ${
                         isVacant ? 'text-amber-400' : 'text-emerald-400'
                       }`}>
                         {isVacant ? '0' : starter ? starter.rating : '—'}
@@ -192,24 +192,24 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
 
                       {/* Depth Band Indicator Dot */}
                       <span
-                        className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-slate-900 shadow-xs flex items-center justify-center text-[7px]"
+                        className="absolute -top-1 -right-1 w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border-2 border-slate-900 shadow-xs flex items-center justify-center text-[7px]"
                         style={{ backgroundColor: isVacant ? '#f59e0b' : band.color }}
                         title={isVacant ? 'Shirt Vacant' : `Depth Score: ${depth} (${band.label})`}
                       >
-                        {(isFragile || isVacant) && <ShieldAlert className="w-2 h-2 text-white" />}
+                        {(isFragile || isVacant) && <ShieldAlert className="w-1.5 h-1.5 sm:w-2 sm:h-2 text-white" />}
                       </span>
                     </div>
 
                     {/* Compact Player Name Label Plaque */}
-                    <div className={`mt-1 px-1.5 py-0.5 rounded-md backdrop-blur-xs border text-center max-w-[76px] sm:max-w-[95px] shadow-sm ${
+                    <div className={`mt-0.5 px-1 py-0.2 rounded-md backdrop-blur-xs border text-center max-w-[48px] sm:max-w-[85px] shadow-sm ${
                       isVacant
                         ? 'bg-amber-950/90 border-amber-400 text-amber-300 font-extrabold'
                         : 'bg-slate-950/85 border-white/20 text-white'
                     }`}>
-                      <p className="text-[9px] sm:text-[10px] font-bold truncate leading-tight">
+                      <p className="text-[7.5px] sm:text-[10px] font-bold truncate leading-tight">
                         {isVacant ? '⚠ VACANT' : starter ? starter.name.split(' ').pop() : 'Empty'}
                       </p>
-                      <p className="text-[8px] font-mono text-slate-300 truncate leading-none">
+                      <p className="text-[6.5px] sm:text-[8px] font-mono text-slate-300 truncate leading-none">
                         {pos.abbr}
                       </p>
                     </div>

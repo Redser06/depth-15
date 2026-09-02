@@ -88,7 +88,7 @@ export const App: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-[#F8FAF8] dark:bg-[#090E17] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-emerald-100 selection:text-emerald-900 transition-colors">
+    <div className="min-h-screen bg-[#F8FAF8] dark:bg-[#090E17] text-slate-900 dark:text-slate-100 flex flex-col selection:bg-emerald-100 selection:text-emerald-900 transition-colors w-full max-w-full overflow-x-hidden">
       {/* App Header */}
       <Header
         activeMember={store.activeMember}
