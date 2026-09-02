@@ -10,6 +10,8 @@ export function validateNoDuplicateStarters(starters: Record<number, PlayerEntry
   const seen = new Map<string, number[]>();
   Object.entries(starters).forEach(([posStr, player]) => {
     const pos = Number(posStr);
+    // Ignore vacant placeholders
+    if (player.id.startsWith('vacant-') || player.rating === 0) return;
     const name = player.name.toLowerCase().trim();
     const existing = seen.get(name) ?? [];
     seen.set(name, [...existing, pos]);
@@ -115,7 +117,7 @@ export function calculateSelectionTradeoffs(
         if (p.status !== 'active') return false;
         const cleanPName = p.name.toLowerCase().trim();
         if (cleanPName === conflict.playerName.toLowerCase().trim()) return false;
-        const assignedPos = currentAssignments[p.name] ?? currentAssignments[cleanPName];
+        const assignedPos = currentAssignments[p.name] ?? currentAssignments[cleanPName] ?? currentAssignments[p.id];
         if (assignedPos !== undefined && assignedPos !== posQ) {
           return false; // Starts in another position!
         }
@@ -184,28 +186,50 @@ export function calculateSelectionTradeoffs(
  * Resolves the 15-position squad depth ladders so that:
  * 1. Every position has exactly ONE unique starter at #1.
  * 2. Multi-position players who start elsewhere rank as cover in their secondary positions with `startsAtOtherPos` set.
- * 3. Returns the resulting Starters, Adjusted Ladders, and Tactical Tradeoffs.
+ * 3. Stale manual starter assignments pointing to retired/inactive players are safely ignored and reported.
+ * 4. Positions where all candidates are assigned elsewhere are explicitly flagged as unresolved/vacant.
+ * 5. Returns the resulting Starters, Adjusted Ladders, and Tactical Tradeoffs with honest count & average.
  */
 export function resolveStartingXV(
   playersByPos: Record<number, PlayerEntry[]>,
   positions: Position[],
   manualAssignments: Record<string, number> = {}
 ): ResolvedSquadSelection {
-  // 1. Detect conflicts
+  // Index all active players to guard against ghost/retired starter assignments
+  const activePlayersByName = new Map<string, PlayerEntry>();
+  const activePlayersById = new Map<string, PlayerEntry>();
+
+  positions.forEach(pos => {
+    (playersByPos[pos.id] ?? []).forEach(p => {
+      if (p.status === 'active') {
+        activePlayersByName.set(p.name.toLowerCase().trim(), p);
+        activePlayersById.set(p.id, p);
+      }
+    });
+  });
+
+  // Filter and sanitize manual assignments: only active players are accepted!
+  const playerAssignedStarters = new Map<string, number>();
+  const ignoredAssignments: string[] = [];
+
+  Object.entries(manualAssignments).forEach(([key, posId]) => {
+    const clean = key.toLowerCase().trim();
+    const player = activePlayersById.get(key) ?? activePlayersByName.get(clean);
+    if (player && player.status === 'active') {
+      playerAssignedStarters.set(player.name.toLowerCase().trim(), posId);
+      playerAssignedStarters.set(player.id, posId);
+    } else {
+      ignoredAssignments.push(key);
+    }
+  });
+
+  // 1. Detect conflicts among active players
   const conflicts = detectStarterConflicts(playersByPos, positions, manualAssignments);
 
   // 2. Compute tradeoffs for each conflict
   const tradeoffs = conflicts.map(c => calculateSelectionTradeoffs(c, playersByPos, positions, manualAssignments));
 
-  // 3. Determine the assigned starting position for each player
-  const playerAssignedStarters = new Map<string, number>();
-
-  // Include any explicit manual assignments first
-  Object.entries(manualAssignments).forEach(([name, posId]) => {
-    playerAssignedStarters.set(name.toLowerCase().trim(), posId);
-  });
-
-  // Then resolve any unassigned conflicting players
+  // 3. Resolve any unassigned conflicting players
   conflicts.forEach(c => {
     const clean = c.playerName.toLowerCase().trim();
     if (!playerAssignedStarters.has(clean)) {
@@ -218,6 +242,7 @@ export function resolveStartingXV(
   // 4. Construct Adjusted Ladders and Starting XV
   const adjustedLadders: Record<number, PlayerEntry[]> = {};
   const starters: Record<number, PlayerEntry> = {};
+  const unresolvedPositions: number[] = [];
 
   positions.forEach(pos => {
     const list = [...(playersByPos[pos.id] ?? [])].filter(p => p.status === 'active');
@@ -230,7 +255,7 @@ export function resolveStartingXV(
 
     list.forEach(player => {
       const cleanName = player.name.toLowerCase().trim();
-      const assignedStarterPos = playerAssignedStarters.get(cleanName);
+      const assignedStarterPos = playerAssignedStarters.get(player.id) ?? playerAssignedStarters.get(cleanName);
 
       if (assignedStarterPos && assignedStarterPos !== pos.id) {
         // Starts in another position! Cannot be #1 here.
@@ -255,6 +280,18 @@ export function resolveStartingXV(
     const starter = eligibleToStart[0];
     if (starter) {
       starters[pos.id] = starter;
+    } else {
+      // Vacated shirt! Explicitly mark as unassigned/vacant
+      unresolvedPositions.push(pos.id);
+      starters[pos.id] = {
+        id: `vacant-${pos.id}`,
+        name: 'Unassigned / Vacant',
+        pos: pos.id,
+        rating: 0,
+        secondary: false,
+        status: 'ineligible',
+        lastReviewed: 'Unresolved',
+      };
     }
 
     // Combine ladder: starter first, then remaining eligible players and cover players ranked by rating
@@ -264,10 +301,11 @@ export function resolveStartingXV(
     adjustedLadders[pos.id] = starter ? [starter, ...coverLadder] : coverLadder;
   });
 
-  // Calculate Starting XV average rating
-  const starterList = Object.values(starters);
-  const startingXVAverageRating = starterList.length > 0
-    ? Math.round(starterList.reduce((sum, p) => sum + p.rating, 0) / starterList.length)
+  // Calculate Starting XV average rating strictly over resolved active starters
+  const resolvedStarters = Object.values(starters).filter(s => s.rating > 0 && s.status === 'active');
+  const resolvedStarterCount = resolvedStarters.length;
+  const startingXVAverageRating = resolvedStarterCount > 0
+    ? Math.round(resolvedStarters.reduce((sum, p) => sum + p.rating, 0) / resolvedStarterCount)
     : 0;
 
   return {
@@ -276,5 +314,9 @@ export function resolveStartingXV(
     conflicts,
     tradeoffs,
     startingXVAverageRating,
+    unresolvedPositions,
+    resolvedStarterCount,
+    ignoredAssignments,
+    totalPositions: positions.length,
   };
 }

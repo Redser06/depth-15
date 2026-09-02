@@ -105,8 +105,8 @@ describe('consensusEngine', () => {
     expect(res.quorumMet).toBe(true);
     expect(res.canResolve).toBe(true);
     expect(res.status).toBe('passed');
-    // values: [86 (proposed), 86, 82, 84] -> [82, 84, 86, 86] -> median is (84+86)/2 = 85
-    expect(res.resolvedRating).toBe(85);
+    // 3 unique voters: [82 (Ronan), 84 (Declan), 86 (Conor)] -> median is 84 (proposer is counted exactly once)
+    expect(res.resolvedRating).toBe(84);
   });
 
   it('evaluates failed proposal when challenges outweigh supports', () => {

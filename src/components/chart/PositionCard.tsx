@@ -1,17 +1,74 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Position, PlayerEntry } from '../../types/depth';
 import { calculateDepthScore, getDepthBand } from '../../lib/depthCalc';
 import { PlayerRow } from './PlayerRow';
-import { PlusCircle, ShieldAlert } from 'lucide-react';
+import { PlusCircle, ExternalLink } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface PositionCardProps {
   position: Position;
   players: PlayerEntry[];
   onChallengePlayer: (player: PlayerEntry) => void;
   onAddPlayer: (pos: Position) => void;
-  onOpenPubView: (posId: number) => void;
-  onReorderLadder?: (posId: number, playerIds: string[]) => void;
+  onOpenPubView?: (posId: number) => void;
+  onReorderLadder?: (posId: number, orderedPlayerIds: string[]) => void;
 }
+
+interface SortablePlayerRowProps {
+  player: PlayerEntry;
+  rank: number;
+  onChallenge: (player: PlayerEntry) => void;
+  isDraggable: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}
+
+const SortablePlayerRow: React.FC<SortablePlayerRowProps> = ({ player, ...rest }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: player.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 20 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <PlayerRow
+        {...rest}
+        player={player}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+};
 
 export const PositionCard: React.FC<PositionCardProps> = ({
   position,
@@ -21,36 +78,26 @@ export const PositionCard: React.FC<PositionCardProps> = ({
   onOpenPubView,
   onReorderLadder,
 }) => {
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
   const depth = calculateDepthScore(players);
   const band = getDepthBand(depth);
   const isVulnerable = depth < 70;
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData('text/plain', `${index}`);
-    setDraggedIndex(index);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    const sourceIndex = draggedIndex ?? Number(e.dataTransfer.getData('text/plain'));
-    if (isNaN(sourceIndex) || sourceIndex === targetIndex || !onReorderLadder) {
-      setDraggedIndex(null);
-      return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id && onReorderLadder) {
+      const oldIndex = players.findIndex((p) => p.id === active.id);
+      const newIndex = players.findIndex((p) => p.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(players, oldIndex, newIndex);
+        onReorderLadder(position.id, reordered.map((p) => p.id));
+      }
     }
-
-    const reordered = [...players];
-    const [moved] = reordered.splice(sourceIndex, 1);
-    if (moved) {
-      reordered.splice(targetIndex, 0, moved);
-      onReorderLadder(position.id, reordered.map((p) => p.id));
-    }
-    setDraggedIndex(null);
   };
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
@@ -58,11 +105,7 @@ export const PositionCard: React.FC<PositionCardProps> = ({
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= players.length) return;
 
-    const reordered = [...players];
-    const temp = reordered[index]!;
-    reordered[index] = reordered[targetIndex]!;
-    reordered[targetIndex] = temp;
-
+    const reordered = arrayMove(players, index, targetIndex);
     onReorderLadder(position.id, reordered.map((p) => p.id));
   };
 
@@ -83,86 +126,66 @@ export const PositionCard: React.FC<PositionCardProps> = ({
               <span className="font-mono text-xs font-bold text-slate-500 dark:text-slate-400">
                 {position.abbr}
               </span>
-              <span className="text-slate-300 dark:text-slate-600">·</span>
-              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                {position.group}
+              <h3 className="font-extrabold text-sm text-slate-900 dark:text-white truncate">
+                {position.name}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${band.border} ${band.color} bg-white dark:bg-slate-800`}>
+                {band.label}
+              </span>
+              <span className="text-[11px] font-mono text-slate-400 dark:text-slate-500">
+                Score: <strong className="text-slate-700 dark:text-slate-300">{depth}</strong>
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* Action icons */}
+        <div className="flex items-center gap-1">
+          {onOpenPubView && (
             <button
               onClick={() => onOpenPubView(position.id)}
-              className="text-left font-extrabold text-slate-900 dark:text-slate-100 hover:text-[#0D6938] dark:hover:text-emerald-400 text-sm sm:text-base leading-tight truncate transition"
-              title="Open focused pub mode for this position"
+              className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+              title="Focus in Pub Mode"
             >
-              {position.name}
+              <ExternalLink className="w-4 h-4" />
             </button>
-          </div>
-        </div>
-
-        {/* Depth Score Block */}
-        <div className="flex flex-col items-end shrink-0">
-          <div className="flex items-center gap-1.5">
-            {isVulnerable && (
-              <span title="Depth under 70 - Vulnerable">
-                <ShieldAlert className="w-4 h-4 text-red-500 animate-pulse" />
-              </span>
-            )}
-            <span
-              className="px-2.5 py-0.5 rounded-lg text-sm sm:text-base font-extrabold text-white font-mono shadow-xs"
-              style={{ backgroundColor: band.color }}
-            >
-              {depth}
-            </span>
-          </div>
-          <span
-            className="text-[10px] font-bold uppercase tracking-wider mt-0.5"
-            style={{ color: band.color }}
-          >
-            {band.label}
-          </span>
+          )}
         </div>
       </div>
 
-      {/* Depth Score Visual Progress bar */}
-      <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 relative overflow-hidden">
-        <div
-          className="h-full transition-all duration-500"
-          style={{
-            width: `${Math.min(100, (depth / 100) * 100)}%`,
-            backgroundColor: band.color,
-          }}
-        />
-      </div>
-
-      {/* Players Ladder (Drag and Drop Supported) */}
-      <div className="p-3 sm:p-3.5 flex-1 flex flex-col gap-2">
+      {/* Players Depth Ladder */}
+      <div className="p-3 space-y-2 flex-1">
         {players.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-400">
+          <div className="p-6 text-center text-xs text-slate-400 font-medium">
             No active players assigned to this position.
           </div>
         ) : (
-          players.map((player, idx) => (
-            <PlayerRow
-              key={player.id}
-              player={player}
-              rank={idx + 1}
-              onChallenge={onChallengePlayer}
-              isDraggable={Boolean(onReorderLadder)}
-              onDragStart={(e) => handleDragStart(e, idx)}
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, idx)}
-              canMoveUp={idx > 0}
-              canMoveDown={idx < players.length - 1}
-              onMoveUp={() => handleMove(idx, 'up')}
-              onMoveDown={() => handleMove(idx, 'down')}
-            />
-          ))
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={players.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              {players.map((player, idx) => (
+                <SortablePlayerRow
+                  key={player.id}
+                  player={player}
+                  rank={idx + 1}
+                  onChallenge={onChallengePlayer}
+                  isDraggable={Boolean(onReorderLadder)}
+                  canMoveUp={idx > 0}
+                  canMoveDown={idx < players.length - 1}
+                  onMoveUp={() => handleMove(idx, 'up')}
+                  onMoveDown={() => handleMove(idx, 'down')}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
       {/* Footer / Quick Add */}
       <div className="p-2.5 bg-slate-50 dark:bg-slate-850/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
         <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-          {players.length} contenders listed (drag to rank)
+          {players.length} contenders listed (touch drag or arrows)
         </span>
 
         <button

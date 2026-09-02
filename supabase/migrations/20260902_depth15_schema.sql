@@ -1,6 +1,10 @@
--- Depth 15: Ireland Rugby Squad Depth Consensus
--- PostgreSQL Schema & Row Level Security (RLS) Policies
+-- ==============================================================================
+-- Depth 15: PostgreSQL Multi-Tenant Consensus Schema (v2 — NOT WIRED)
+-- Note: Current production runtime is client-consensus on Firebase Hosting.
+-- This schema represents the candidate architecture for future server sync.
+-- ==============================================================================
 
+-- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Groups (Private pub consensus rooms)
@@ -134,7 +138,10 @@ CREATE TABLE IF NOT EXISTS proposals (
   pos INT NOT NULL REFERENCES positions(id),
   current_value NUMERIC,
   proposed_value NUMERIC NOT NULL,
-  rationale TEXT NOT NULL CHECK (char_length(rationale) >= 140), -- Enforcing 140-char pub minimum rule
+  rationale TEXT NOT NULL CHECK (
+    (proposal_type = 'retire' AND char_length(rationale) >= 0) OR
+    (char_length(rationale) >= 15)
+  ), -- 0 chars for retirements, 15-char pub rationale for challenges
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'passed', 'failed', 'cancelled')),
   resolved_value NUMERIC,
   resolution_note TEXT,

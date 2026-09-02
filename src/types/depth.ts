@@ -148,10 +148,27 @@ export interface TacticalTradeoff {
   explanation: string;
 }
 
+export interface ProposalResolution {
+  canResolve: boolean;
+  quorumMet: boolean;
+  supports: number;
+  challenges: number;
+  status: 'open' | 'passed' | 'failed';
+  proposalType: ProposalType;
+  resolvedRating?: number;
+  resolvedAction?: 'rerate' | 'retire' | 'add_player' | 'reorder' | 'add_secondary' | 'select_starter';
+  spread?: RatingSpread;
+  summary: string;
+}
+
 export interface ResolvedSquadSelection {
   starters: Record<number, PlayerEntry>;
   adjustedLadders: Record<number, PlayerEntry[]>;
   conflicts: StarterConflict[];
   tradeoffs: TacticalTradeoff[];
   startingXVAverageRating: number;
+  unresolvedPositions: number[];
+  resolvedStarterCount: number;
+  ignoredAssignments: string[];
+  totalPositions: number;
 }

@@ -1,4 +1,4 @@
-import { Proposal, RatingSpread, PlayerEntry } from '../types/depth';
+import { Proposal, RatingSpread, PlayerEntry, ProposalResolution } from '../types/depth';
 
 /**
  * Calculates the mathematical median of a list of numbers
@@ -34,19 +34,13 @@ export function calculateSpreadMetrics(values: number[]): RatingSpread {
   };
 }
 
-export interface ProposalResolution {
-  canResolve: boolean;
-  quorumMet: boolean;
-  supports: number;
-  challenges: number;
-  status: 'open' | 'passed' | 'failed';
-  resolvedRating?: number;
-  spread?: RatingSpread;
-  summary: string;
-}
+export type { ProposalResolution };
 
 /**
- * Evaluates whether a proposal has reached quorum and passes or fails
+ * Evaluates whether a proposal has reached quorum and passes or fails.
+ * Guarantees strict 1:1 mathematical vote aggregation:
+ * - Exactly one value per vote + proposer's proposedValue once.
+ * - Never returns NaN for non-numeric proposals (retire, reorder).
  */
 export function evaluateProposal(
   proposal: Proposal,
@@ -66,27 +60,71 @@ export function evaluateProposal(
       supports,
       challenges,
       status: 'open',
+      proposalType: proposal.type,
       summary: `Needs ${quorumRequired - totalVotes} more vote(s) to reach quorum (${totalVotes}/${quorumRequired}).`,
     };
   }
 
   // Quorum met!
   if (supports > challenges) {
-    // Collect all submitted counter values + proposer's value
-    const values: number[] = [];
-    if (typeof proposal.proposedValue === 'number') {
-      values.push(proposal.proposedValue);
+    if (proposal.type === 'retire') {
+      return {
+        canResolve: true,
+        quorumMet: true,
+        supports,
+        challenges,
+        status: 'passed',
+        proposalType: proposal.type,
+        resolvedAction: 'retire',
+        summary: `Passed: Retirement of ${proposal.targetPlayerName} confirmed by majority (${supports} vs ${challenges}).`,
+      };
     }
+
+    if (proposal.type === 'reorder') {
+      return {
+        canResolve: true,
+        quorumMet: true,
+        supports,
+        challenges,
+        status: 'passed',
+        proposalType: proposal.type,
+        resolvedAction: 'reorder',
+        summary: `Passed: Ladder reordering approved by majority (${supports} vs ${challenges}).`,
+      };
+    }
+
+    // For numeric proposals ('rerate', 'add_player', 'add_secondary'):
+    // Build value pool with strict 1:1 mathematical integrity:
+    // Exactly one value per vote (the vote's counterValue ?? proposedValue for support,
+    // or the member's stated counter for challenge) + proposer's proposedValue once.
+    const values: number[] = [];
+    const memberVoted = new Set<string>();
+
     proposal.votes.forEach(v => {
+      // Avoid duplicate votes from the same member
+      if (memberVoted.has(v.memberId)) return;
+      memberVoted.add(v.memberId);
+
       if (typeof v.counterValue === 'number' && !isNaN(v.counterValue)) {
         values.push(v.counterValue);
-      } else if (v.choice === 'support' && typeof proposal.proposedValue === 'number') {
-        values.push(proposal.proposedValue);
+      } else if (v.choice === 'support') {
+        const val = typeof proposal.proposedValue === 'number' ? proposal.proposedValue : Number(proposal.proposedValue);
+        if (!isNaN(val)) values.push(val);
+      } else if (v.choice === 'challenge') {
+        // If challenge has no explicit counter, fall back to currentValue
+        const val = typeof proposal.currentValue === 'number' ? proposal.currentValue : Number(proposal.currentValue);
+        if (!isNaN(val)) values.push(val);
       }
     });
 
-    const resolvedRating = values.length > 0 ? calculateMedian(values) : Number(proposal.proposedValue);
-    const spread = calculateSpreadMetrics(values);
+    // If proposer has not voted as a member in proposal.votes, add their proposedValue once
+    if (!memberVoted.has(proposal.proposerId)) {
+      const proposerVal = typeof proposal.proposedValue === 'number' ? proposal.proposedValue : Number(proposal.proposedValue);
+      if (!isNaN(proposerVal)) values.push(proposerVal);
+    }
+
+    const resolvedRating = values.length > 0 ? calculateMedian(values) : undefined;
+    const spread = values.length > 0 ? calculateSpreadMetrics(values) : undefined;
 
     return {
       canResolve: true,
@@ -94,9 +132,11 @@ export function evaluateProposal(
       supports,
       challenges,
       status: 'passed',
+      proposalType: proposal.type,
       resolvedRating,
+      resolvedAction: proposal.type,
       spread,
-      summary: `Passed by majority support (${supports} vs ${challenges}). Consensus median rating: ${resolvedRating}.`,
+      summary: `Passed by majority support (${supports} vs ${challenges}). Consensus median rating: ${resolvedRating ?? 'approved'}.`,
     };
   } else {
     return {
@@ -105,7 +145,8 @@ export function evaluateProposal(
       supports,
       challenges,
       status: 'failed',
-      summary: `Failed: Challenges (${challenges}) met or exceeded supports (${supports}). Player rating flagged Contested.`,
+      proposalType: proposal.type,
+      summary: `Failed: Challenges (${challenges}) met or exceeded supports (${supports}).`,
     };
   }
 }
@@ -130,18 +171,30 @@ export function getMostContested(players: PlayerEntry[], limit: number = 10): Pl
 export function calculateMovers(
   currentPlayers: PlayerEntry[],
   baselinePlayers: PlayerEntry[]
-): Array<{ player: PlayerEntry; delta: number; baselineRating: number }> {
-  const baselineMap = new Map(baselinePlayers.map(p => [`${p.pos}-${p.name.toLowerCase()}`, p.rating]));
-  
+): Array<{
+  player: PlayerEntry;
+  baselineRating: number;
+  delta: number;
+  direction: 'up' | 'down' | 'flat';
+}> {
+  const baselineMap = new Map<string, number>();
+  baselinePlayers.forEach(p => {
+    baselineMap.set(`${p.pos}-${p.name.toLowerCase().trim()}`, p.rating);
+  });
+
   return currentPlayers
     .filter(p => p.status === 'active')
     .map(p => {
-      const key = `${p.pos}-${p.name.toLowerCase()}`;
+      const key = `${p.pos}-${p.name.toLowerCase().trim()}`;
       const baselineRating = baselineMap.get(key) ?? p.rating;
+      const delta = p.rating - baselineRating;
+      const direction = delta > 0 ? ('up' as const) : delta < 0 ? ('down' as const) : ('flat' as const);
+
       return {
         player: p,
-        delta: p.rating - baselineRating,
         baselineRating,
+        delta,
+        direction,
       };
     })
     .filter(m => m.delta !== 0)

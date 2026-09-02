@@ -17,6 +17,7 @@ interface PlayerRowProps {
   onMoveDown?: () => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  dragHandleProps?: Record<string, any>;
 }
 
 export const PlayerRow: React.FC<PlayerRowProps> = ({
@@ -32,6 +33,7 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
   onMoveDown,
   canMoveUp = false,
   canMoveDown = false,
+  dragHandleProps,
 }) => {
   const { tier, pillClass, badgeColor } = getRatingTier(player.rating);
 
@@ -65,7 +67,13 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
       >
         <div className="flex items-center gap-2 min-w-0">
           {isDraggable && (
-            <GripVertical className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 shrink-0" />
+            <div
+              {...dragHandleProps}
+              className="touch-none cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+              title="Drag to reorder ladder"
+            >
+              <GripVertical className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 shrink-0" />
+            </div>
           )}
           <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold ${rankBg}`}>
             {rank}
@@ -128,7 +136,8 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
           {isDraggable && (
             <div className="flex items-center gap-1 shrink-0 mt-0.5">
               <div
-                className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                {...dragHandleProps}
+                className="touch-none cursor-grab active:cursor-grabbing p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 title="Drag to reorder ladder"
               >
                 <GripVertical className="w-4 h-4" />

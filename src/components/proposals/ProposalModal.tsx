@@ -19,8 +19,16 @@ interface ProposalModalProps {
   }) => void;
 }
 
-export const ProposalModal: React.FC<ProposalModalProps> = ({
-  isOpen,
+interface ProposalFormModalInnerProps {
+  onClose: () => void;
+  targetPlayer?: PlayerEntry;
+  targetPosition?: Position;
+  positions: Position[];
+  initialRationale?: string;
+  onSubmit: ProposalModalProps['onSubmit'];
+}
+
+const ProposalFormModalInner: React.FC<ProposalFormModalInnerProps> = ({
   onClose,
   targetPlayer,
   targetPosition,
@@ -28,8 +36,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
   initialRationale = '',
   onSubmit,
 }) => {
-  if (!isOpen) return null;
-
+  // Hooks unconditionally declared at root of component
   const [type, setType] = useState<ProposalType>(targetPlayer ? 'rerate' : 'add_player');
   const [selectedPos, setSelectedPos] = useState<number>(targetPosition?.id ?? targetPlayer?.pos ?? 10);
   const [playerName, setPlayerName] = useState<string>(targetPlayer?.name ?? '');
@@ -317,5 +324,29 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
         </form>
       </div>
     </div>
+  );
+};
+
+export const ProposalModal: React.FC<ProposalModalProps> = ({
+  isOpen,
+  onClose,
+  targetPlayer,
+  targetPosition,
+  positions,
+  initialRationale = '',
+  onSubmit,
+}) => {
+  if (!isOpen) return null;
+
+  return (
+    <ProposalFormModalInner
+      key={`${targetPlayer?.id ?? 'new'}-${targetPosition?.id ?? 'pos'}`}
+      onClose={onClose}
+      targetPlayer={targetPlayer}
+      targetPosition={targetPosition}
+      positions={positions}
+      initialRationale={initialRationale}
+      onSubmit={onSubmit}
+    />
   );
 };

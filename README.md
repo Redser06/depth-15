@@ -26,17 +26,23 @@
 3. **Starter Uniqueness Constraint & Tactical Opportunity Costs**
    - Enforces the core rule: **A player cannot be #1 starter in 2 positions simultaneously**.
    - Automatically computes the opportunity cost of playing a star in one position versus another based on the replacement drop-off gap to the backup (e.g. Tadhg Beirne at 5 Lock vs 6 Blindside Flanker).
+   - Surfaces unassigned/vacated shirts explicitly with `unresolvedPositions` and excludes empty shirts from headline averages.
 
-4. **Drag-to-Rank Ladder UX**
-   - Drag and drop contender cards or use quick up/down steppers to rank order positions.
-   - Dragging a contender to #1 dynamically reassigns the starting designation and re-evaluates conflicts.
+4. **Touch-First Drag-to-Rank Ladder UX**
+   - Native mobile touch drag (`@dnd-kit` with `TouchSensor` & `PointerSensor`) alongside one-tap precision up/down stepper arrows.
+   - Reordering contender cards to #1 dynamically reassigns the starting designation, safely checks player active status, and re-evaluates tactical trade-offs.
 
-5. **Streamlined Pub Rationale**
-   - Zero-essay requirement for retirements/out players.
+5. **Consensus Mathematics & Typed Domain Effects**
+   - Strict 1:1 mathematical vote aggregation (exactly one entry per voter, zero double-counting, zero phantom votes).
+   - Passed proposals apply verified state mutations (retirements set status to `retired` and purge starter assignments; re-rates update spread; additions insert contenders).
+   - Non-numeric proposals never resolve to sentinel `NaN` values.
+
+6. **Streamlined Pub Rationale**
+   - Zero-essay requirement for retirements/out players (0 chars).
    - Quick 15-character minimum for rating challenges with one-tap quick reason chips.
 
-6. **Automated CI/CD Pipeline (GitHub Actions)**
-   - **Pull Request CI (`preview.yml`)**: Runs typechecks, 28 Vitest tests, builds, and provisions a 7-day Firebase preview channel with interactive PR comment.
+7. **Automated CI/CD Pipeline (GitHub Actions)**
+   - **Pull Request CI (`preview.yml`)**: Runs typechecks, 35 Vitest tests, builds, and provisions a 7-day Firebase preview channel with interactive PR comment.
    - **Production CD (`deploy-production.yml`)**: Automatically tests, builds, and deploys merges to `main` straight to `https://depth-15.web.app`.
 
 ---
@@ -45,7 +51,8 @@
 
 - **Framework:** React 18 + TypeScript + Vite
 - **Styling:** Tailwind CSS + Lucide Icons + Canvas Confetti
-- **Testing:** Vitest (28 tests across selection engine, consensus math, and tactical coordinates)
+- **Gestures:** `@dnd-kit/core` & `@dnd-kit/sortable` (Touch & Pointer Sensors)
+- **Testing:** Vitest (35 tests: selection engine, 1:1 consensus math, adversarial probes, vacated ladders, tactical coordinates)
 - **CI/CD:** GitHub Actions + Firebase Extended Hosting Action
 - **Hosting:** Firebase Hosting Multi-site (`depth-15`)
 
@@ -53,7 +60,7 @@
 # Development server
 npm run dev
 
-# Run Vitest test suite
+# Run Vitest test suite (35 tests)
 npm test
 
 # Typecheck and build

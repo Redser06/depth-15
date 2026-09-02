@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant } from '../types/depth';
+import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution } from '../types/depth';
 import { BASELINE_PLAYERS, IMMUTABLE_2025_SNAPSHOT, POSITIONS } from '../data/baseline2025';
 import { DEFAULT_MEMBERS, DEFAULT_GROUP_CODE } from '../data/defaultMembers';
 import { evaluateProposal } from './consensusEngine';
@@ -388,24 +388,96 @@ export function useDepthStore() {
     return newProposal;
   }, [activeMember]);
 
-  const castVote = useCallback((
-    proposalId: string,
-    choice: 'support' | 'challenge',
-    counterValue?: number,
-    rationale?: string
-  ) => {
+  // Domain effect mutation applier for passed proposals (BLOCKER 1 & SERIOUS 2)
+  const applyPassedProposalMutation = useCallback((prop: Proposal, resolution: ProposalResolution) => {
+    const cleanName = prop.targetPlayerName.toLowerCase().trim();
+
+    if (prop.type === 'retire') {
+      // 1. Mark player retired
+      setPlayers(curr => curr.map(pl => {
+        if (pl.name.toLowerCase().trim() === cleanName) {
+          return {
+            ...pl,
+            status: 'retired',
+            statusReason: prop.rationale || 'Retired by group consensus',
+          };
+        }
+        return pl;
+      }));
+
+      // 2. Purge any starter assignments for this player
+      setStarterAssignments(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => {
+          if (k.toLowerCase().trim() === cleanName) {
+            delete next[k];
+          }
+        });
+        return next;
+      });
+    } else if (prop.type === 'add_player') {
+      const rating = typeof resolution.resolvedRating === 'number' && !isNaN(resolution.resolvedRating)
+        ? resolution.resolvedRating
+        : (typeof prop.proposedValue === 'number' && !isNaN(prop.proposedValue) ? prop.proposedValue : 70);
+
+      const newPlayer: PlayerEntry = {
+        id: `p-${prop.pos}-${Date.now()}`,
+        name: prop.targetPlayerName.trim(),
+        pos: prop.pos,
+        rating,
+        secondary: false,
+        status: 'active',
+        lastReviewed: 'Consensus Add',
+        spread: resolution.spread ?? {
+          min: rating,
+          max: rating,
+          stdDev: 0,
+          voteCount: prop.votes.length,
+        },
+        isContested: false,
+        disputeCount: 0,
+      };
+
+      setPlayers(curr => [...curr, newPlayer]);
+    } else if (prop.type === 'reorder' || prop.type === 'select_starter') {
+      // Assign target player as starter for this position
+      setStarterAssignments(prev => ({
+        ...prev,
+        [prop.targetPlayerName.trim()]: prop.pos,
+      }));
+    } else {
+      // Default: rerate / add_secondary
+      const newRating = resolution.resolvedRating ?? (typeof prop.proposedValue === 'number' ? prop.proposedValue : 75);
+      setPlayers(curr => curr.map(pl => {
+        if (pl.pos === prop.pos && pl.name.toLowerCase().trim() === cleanName) {
+          return {
+            ...pl,
+            rating: newRating,
+            spread: resolution.spread ?? pl.spread,
+            isContested: false,
+            lastReviewed: new Date().toLocaleDateString('en-IE', { month: 'short', year: 'numeric' }),
+          };
+        }
+        return pl;
+      }));
+    }
+  }, []);
+
+  const castVote = useCallback((proposalId: string, choice: 'support' | 'challenge', counterValue?: number, rationale?: string) => {
     setProposals(prev => prev.map(prop => {
       if (prop.id !== proposalId) return prop;
 
-      // Filter out previous vote from this member if any
+      // Filter out existing vote from this member if any (one vote per member)
       const otherVotes = prop.votes.filter(v => v.memberId !== activeMember.id);
-      const newVote = {
+      const newVote: Proposal['votes'][0] = {
         id: `v-${Date.now()}`,
-        proposalId,
+        proposalId: prop.id,
         memberId: activeMember.id,
         memberName: activeMember.name,
         choice,
-        counterValue: counterValue ?? (choice === 'support' ? Number(prop.proposedValue) : undefined),
+        counterValue: choice === 'challenge'
+          ? (counterValue ?? (typeof prop.currentValue === 'number' ? prop.currentValue : 70))
+          : (counterValue ?? (typeof prop.proposedValue === 'number' ? prop.proposedValue : undefined)),
         rationale,
         timestamp: new Date().toISOString(),
       };
@@ -419,32 +491,19 @@ export function useDepthStore() {
       // Check if quorum is met
       const resolution = evaluateProposal(updatedProp, DEFAULT_MEMBERS.filter(m => m.role !== 'lurker').length);
       if (resolution.canResolve) {
-        // Auto-resolve when quorum is met!
-        if (resolution.status === 'passed' && typeof resolution.resolvedRating === 'number') {
-          // Update player in players state
-          setPlayers(curr => curr.map(pl => {
-            if (pl.pos === prop.pos && pl.name.toLowerCase() === prop.targetPlayerName.toLowerCase()) {
-              return {
-                ...pl,
-                rating: resolution.resolvedRating!,
-                spread: resolution.spread ?? pl.spread,
-                isContested: false,
-                lastReviewed: new Date().toLocaleDateString('en-IE', { month: 'short', year: 'numeric' }),
-              };
-            }
-            return pl;
-          }));
+        if (resolution.status === 'passed') {
+          applyPassedProposalMutation(updatedProp, resolution);
           return {
             ...updatedProp,
             status: 'passed',
             resolvedAt: new Date().toISOString(),
-            resolvedValue: resolution.resolvedRating,
+            resolvedValue: resolution.resolvedRating ?? (prop.type === 'retire' ? 'retired' : prop.proposedValue),
             resolutionNote: resolution.summary,
           };
         } else if (resolution.status === 'failed') {
           // Flag player as contested
           setPlayers(curr => curr.map(pl => {
-            if (pl.pos === prop.pos && pl.name.toLowerCase() === prop.targetPlayerName.toLowerCase()) {
+            if (pl.pos === prop.pos && pl.name.toLowerCase().trim() === prop.targetPlayerName.toLowerCase().trim()) {
               return {
                 ...pl,
                 isContested: true,
@@ -464,7 +523,7 @@ export function useDepthStore() {
 
       return updatedProp;
     }));
-  }, [activeMember]);
+  }, [activeMember, applyPassedProposalMutation]);
 
   const addComment = useCallback((proposalId: string, text: string) => {
     if (!text.trim()) return;
@@ -492,29 +551,18 @@ export function useDepthStore() {
       if (prop.id !== proposalId) return prop;
       const resolution = evaluateProposal(prop, DEFAULT_MEMBERS.filter(m => m.role !== 'lurker').length);
       
-      if (resolution.status === 'passed' && typeof resolution.resolvedRating === 'number') {
-        setPlayers(curr => curr.map(pl => {
-          if (pl.pos === prop.pos && pl.name.toLowerCase() === prop.targetPlayerName.toLowerCase()) {
-            return {
-              ...pl,
-              rating: resolution.resolvedRating!,
-              spread: resolution.spread ?? pl.spread,
-              isContested: false,
-              lastReviewed: new Date().toLocaleDateString('en-IE', { month: 'short', year: 'numeric' }),
-            };
-          }
-          return pl;
-        }));
+      if (resolution.status === 'passed') {
+        applyPassedProposalMutation(prop, resolution);
         return {
           ...prop,
           status: 'passed',
           resolvedAt: new Date().toISOString(),
-          resolvedValue: resolution.resolvedRating,
+          resolvedValue: resolution.resolvedRating ?? (prop.type === 'retire' ? 'retired' : prop.proposedValue),
           resolutionNote: resolution.summary,
         };
       } else {
         setPlayers(curr => curr.map(pl => {
-          if (pl.pos === prop.pos && pl.name.toLowerCase() === prop.targetPlayerName.toLowerCase()) {
+          if (pl.pos === prop.pos && pl.name.toLowerCase().trim() === prop.targetPlayerName.toLowerCase().trim()) {
             return {
               ...pl,
               isContested: true,
@@ -531,7 +579,7 @@ export function useDepthStore() {
         };
       }
     }));
-  }, []);
+  }, [applyPassedProposalMutation]);
 
   // Rebase actions
   const openRebase = useCallback(() => {
@@ -634,6 +682,20 @@ export function useDepthStore() {
       return p;
     });
 
+    // Purge any retired players from starter assignments
+    const retiredNames = new Set(
+      updated.filter(p => p.status === 'retired').map(p => p.name.toLowerCase().trim())
+    );
+    setStarterAssignments(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => {
+        if (retiredNames.has(k.toLowerCase().trim())) {
+          delete next[k];
+        }
+      });
+      return next;
+    });
+
     setPlayers(updated);
 
     // 4. Create new snapshot
@@ -661,7 +723,14 @@ export function useDepthStore() {
   }, [players, rebaseSession, activeMember]);
 
   const resetAllToBaseline = useCallback(() => {
-    localStorage.clear();
+    // Scoped storage removal (LAZY 3) — never nuke unrelated keys on shared origin
+    Object.values(STORAGE_KEYS).forEach(key => {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        // ignore
+      }
+    });
     setPlayers(BASELINE_PLAYERS);
     setProposals(INITIAL_PROPOSALS);
     setSnapshots([IMMUTABLE_2025_SNAPSHOT]);

@@ -1,20 +1,83 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Position, PlayerEntry, Proposal } from '../../types/depth';
 import { calculateDepthScore, getDepthBand } from '../../lib/depthCalc';
 import { PlayerRow } from '../chart/PlayerRow';
-import { ChevronLeft, ChevronRight, MessageSquare, PlusCircle, ShieldAlert } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ShieldAlert,
+  PlusCircle,
+  MessageSquare,
+} from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface PubModeViewProps {
   positions: Position[];
   playersByPos: Record<number, PlayerEntry[]>;
   selectedPosId: number;
-  onSelectPosId: (id: number) => void;
+  onSelectPosId: (posId: number) => void;
   onChallengePlayer: (player: PlayerEntry) => void;
   onAddPlayer: (pos: Position) => void;
   openProposals: Proposal[];
-  onViewProposal: (prop: Proposal) => void;
-  onReorderLadder?: (posId: number, playerIds: string[]) => void;
+  onViewProposal: (proposal: Proposal) => void;
+  onReorderLadder?: (posId: number, orderedPlayerIds: string[]) => void;
 }
+
+interface SortablePlayerRowProps {
+  player: PlayerEntry;
+  rank: number;
+  onChallenge: (player: PlayerEntry) => void;
+  isDraggable: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}
+
+const SortablePlayerRow: React.FC<SortablePlayerRowProps> = ({ player, ...rest }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: player.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.6 : 1,
+    zIndex: isDragging ? 20 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <PlayerRow
+        {...rest}
+        player={player}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  );
+};
 
 export const PubModeView: React.FC<PubModeViewProps> = ({
   positions,
@@ -27,8 +90,6 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
   onViewProposal,
   onReorderLadder,
 }) => {
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-
   const currentPos = positions.find((p) => p.id === selectedPosId) ?? positions[0]!;
   const players = playersByPos[currentPos.id] ?? [];
   const depth = calculateDepthScore(players);
@@ -46,30 +107,22 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
 
   const posProposals = openProposals.filter((p) => p.pos === currentPos.id);
 
-  const handleDragStart = (e: React.DragEvent, index: number) => {
-    e.dataTransfer.setData('text/plain', `${index}`);
-    setDraggedIndex(index);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    const sourceIndex = draggedIndex ?? Number(e.dataTransfer.getData('text/plain'));
-    if (isNaN(sourceIndex) || sourceIndex === targetIndex || !onReorderLadder) {
-      setDraggedIndex(null);
-      return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id && onReorderLadder) {
+      const oldIndex = players.findIndex((p) => p.id === active.id);
+      const newIndex = players.findIndex((p) => p.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const reordered = arrayMove(players, oldIndex, newIndex);
+        onReorderLadder(currentPos.id, reordered.map((p) => p.id));
+      }
     }
-
-    const reordered = [...players];
-    const [moved] = reordered.splice(sourceIndex, 1);
-    if (moved) {
-      reordered.splice(targetIndex, 0, moved);
-      onReorderLadder(currentPos.id, reordered.map((p) => p.id));
-    }
-    setDraggedIndex(null);
   };
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
@@ -77,11 +130,7 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= players.length) return;
 
-    const reordered = [...players];
-    const temp = reordered[index]!;
-    reordered[index] = reordered[targetIndex]!;
-    reordered[targetIndex] = temp;
-
+    const reordered = arrayMove(players, index, targetIndex);
     onReorderLadder(currentPos.id, reordered.map((p) => p.id));
   };
 
@@ -143,7 +192,7 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Ranked ladder &amp; consensus quality ratings (drag to rank)
+              Ranked ladder &amp; consensus quality ratings (touch drag or arrows)
             </p>
           </div>
 
@@ -187,11 +236,11 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
         )}
       </div>
 
-      {/* Players Ladder List with Drag and Drop */}
+      {/* Players Ladder List with Touch & Pointer Drag and Drop */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Position Ladder ({players.length}) — Drag to Rank
+            Position Ladder ({players.length}) — Touch Drag or Arrows
           </span>
           <button
             onClick={() => onAddPlayer(currentPos)}
@@ -202,22 +251,29 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
           </button>
         </div>
 
-        {players.map((player, idx) => (
-          <PlayerRow
-            key={player.id}
-            player={player}
-            rank={idx + 1}
-            onChallenge={onChallengePlayer}
-            isDraggable={Boolean(onReorderLadder)}
-            onDragStart={(e) => handleDragStart(e, idx)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, idx)}
-            canMoveUp={idx > 0}
-            canMoveDown={idx < players.length - 1}
-            onMoveUp={() => handleMove(idx, 'up')}
-            onMoveDown={() => handleMove(idx, 'down')}
-          />
-        ))}
+        {players.length === 0 ? (
+          <div className="p-6 text-center text-xs text-slate-400 font-medium bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+            No active players assigned to this position.
+          </div>
+        ) : (
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={players.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              {players.map((player, idx) => (
+                <SortablePlayerRow
+                  key={player.id}
+                  player={player}
+                  rank={idx + 1}
+                  onChallenge={onChallengePlayer}
+                  isDraggable={Boolean(onReorderLadder)}
+                  canMoveUp={idx > 0}
+                  canMoveDown={idx < players.length - 1}
+                  onMoveUp={() => handleMove(idx, 'up')}
+                  onMoveDown={() => handleMove(idx, 'down')}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+        )}
       </div>
     </div>
   );
