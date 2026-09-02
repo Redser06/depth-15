@@ -37,9 +37,25 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
   const [rationale, setRationale] = useState<string>(initialRationale);
   const [error, setError] = useState<string | null>(null);
 
-  const MIN_CHARS = 140;
+  const isRetire = type === 'retire';
+  // Retire/out requires no minimum essay (0 chars). Normal challenge requires brief 15 chars.
+  const MIN_CHARS = isRetire ? 0 : 15;
   const currentLength = rationale.trim().length;
   const charsRemaining = Math.max(0, MIN_CHARS - currentLength);
+
+  const QUICK_REASONS = isRetire
+    ? [
+        'Retired from rugby',
+        'Moved abroad / ineligible',
+        'Long-term injury',
+        'Left provincial squad',
+      ]
+    : [
+        'Standout European form',
+        'Outperformed rival in camp',
+        'Dominant set-piece work',
+        'Exposed in recent tests',
+      ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,12 +63,14 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
       setError('Please provide a player name.');
       return;
     }
-    if (currentLength < MIN_CHARS) {
-      setError(`Pub rule: Rationale must be at least ${MIN_CHARS} characters. No naked numbers! (${charsRemaining} characters left)`);
+
+    if (!isRetire && currentLength < MIN_CHARS) {
+      setError(`Pub rule: Give a brief reason (${MIN_CHARS} chars minimum). No essays needed! (${charsRemaining} characters left)`);
       return;
     }
 
     const currentVal = targetPlayer?.rating ?? 0;
+    const finalRationale = rationale.trim() || (isRetire ? `${playerName.trim()} retired / unavailable for selection.` : 'Consensus proposal update.');
 
     onSubmit({
       type,
@@ -60,7 +78,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
       pos: selectedPos,
       currentValue: currentVal,
       proposedValue: proposedRating,
-      rationale: rationale.trim(),
+      rationale: finalRationale,
     });
 
     onClose();
@@ -216,32 +234,61 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
             </div>
           )}
 
-          {/* Mandatory Rationale */}
+          {/* Rationale Input */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label htmlFor="rationale-input" className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                <span>Pub Rationale</span>
-                <span className="text-red-500">*</span>
+                <span>{isRetire ? 'Reason' : 'Pub Rationale'}</span>
+                {!isRetire && <span className="text-red-500">*</span>}
               </label>
               <span
                 className={`text-[11px] font-mono font-semibold ${
-                  charsRemaining > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                  isRetire
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : charsRemaining > 0
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-emerald-600 dark:text-emerald-400'
                 }`}
               >
-                {charsRemaining > 0 ? `${charsRemaining} chars needed` : `${currentLength} chars (Good)`}
+                {isRetire
+                  ? 'Ready (No essay needed)'
+                  : charsRemaining > 0
+                  ? `${charsRemaining} chars needed (15 min)`
+                  : `${currentLength} chars (Good)`}
               </span>
+            </div>
+
+            {/* Quick Reason Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-2">
+              <span className="text-[10px] text-slate-400 font-medium">Quick tap:</span>
+              {QUICK_REASONS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => setRationale(chip)}
+                  className="px-2 py-0.5 text-[10px] font-medium rounded-md bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 hover:text-[#0D6938] dark:hover:bg-emerald-950/60 dark:hover:text-emerald-300 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition"
+                >
+                  + {chip}
+                </button>
+              ))}
             </div>
 
             <textarea
               id="rationale-input"
               value={rationale}
               onChange={(e) => setRationale(e.target.value)}
-              rows={4}
-              placeholder="State your empirical case: form against test opposition, scrum dominance, European minutes, Lions readiness, breakdown work..."
+              rows={3}
+              placeholder={
+                isRetire
+                  ? "Optional: e.g. Retired from test rugby, signed abroad in Top 14, long-term ACL..."
+                  : "Quick pub reason: e.g. Outstanding against SA in summer, dominant scrummaging, outplayed rival in camp..."
+              }
               className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-[#0D6938] resize-none"
             />
             <p className="text-[10px] text-slate-400 mt-1">
-              Minimum 140 characters required. The group votes on arguments, not naked numbers.
+              {isRetire
+                ? "They're gone and that's that — no essay needed."
+                : "Keep it punchy. Quick empirical argument, no essays required."}
             </p>
           </div>
 
@@ -256,9 +303,9 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={currentLength < MIN_CHARS}
+              disabled={!isRetire && currentLength < MIN_CHARS}
               className={`flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-white transition shadow-sm ${
-                currentLength >= MIN_CHARS
+                isRetire || currentLength >= MIN_CHARS
                   ? 'bg-[#0D6938] hover:bg-emerald-800 cursor-pointer active:scale-95'
                   : 'bg-slate-300 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
               }`}

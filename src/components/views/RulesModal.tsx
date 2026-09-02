@@ -72,7 +72,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
               <span>2. The Propose &amp; Challenge Rules</span>
             </h4>
             <ul className="space-y-1.5 list-disc pl-4 text-slate-600 dark:text-slate-300">
-              <li><strong>No naked numbers:</strong> Re-rate proposals require at least 140 characters of reasoned argument.</li>
+              <li><strong>No naked numbers:</strong> Re-rate proposals require a brief reasoned argument (min 15 chars). Retired or unavailable players require no essay.</li>
               <li><strong>Quorum:</strong> 50% of active group members must vote before a proposal can close.</li>
               <li><strong>The Median Rule:</strong> When a proposal passes, the new rating is the <em>median of all submitted counter-values</em>, including the proposer's. No single loud voice can warp a rating.</li>
               <li><strong>Contested Ratings:</strong> If challenges equal or exceed support, the rating is flagged as Contested for 30 days with a visible hatched bar.</li>
