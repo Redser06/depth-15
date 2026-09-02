@@ -15,6 +15,8 @@ import { VulnerabilityView } from './components/views/VulnerabilityView';
 import { SnapshotsDiffView } from './components/views/SnapshotsDiffView';
 import { RebaseWizard } from './components/rebase/RebaseWizard';
 import { RulesModal } from './components/views/RulesModal';
+import { RugbyPitchView } from './components/analytics/RugbyPitchView';
+import { AnalystChartsView } from './components/analytics/AnalystChartsView';
 import { PlayerEntry, Position, Proposal } from './types/depth';
 import { Search, RotateCcw } from 'lucide-react';
 
@@ -191,6 +193,29 @@ export const App: React.FC = () => {
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TACTICAL PITCH VIEW */}
+        {currentTab === 'pitch' && (
+          <div className="animate-in fade-in duration-200">
+            <RugbyPitchView
+              positions={POSITIONS}
+              playersByPos={playersByPos}
+              onSelectPosition={handleOpenPubView}
+              onChallengePlayer={handleChallengePlayer}
+            />
+          </div>
+        )}
+
+        {/* ANALYST CHARTS VIEW */}
+        {currentTab === 'analytics' && (
+          <div className="animate-in fade-in duration-200">
+            <AnalystChartsView
+              positions={POSITIONS}
+              playersByPos={playersByPos}
+              onSelectPosition={handleOpenPubView}
+            />
           </div>
         )}
 

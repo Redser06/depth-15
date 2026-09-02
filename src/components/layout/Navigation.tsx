@@ -8,9 +8,11 @@ import {
   ShieldAlert,
   Sparkles,
   GitCompare,
+  Compass,
+  LineChart,
 } from 'lucide-react';
 
-export type TabType = 'chart' | 'pub' | 'proposals' | 'contested' | 'movers' | 'vulnerability' | 'rebase' | 'diff';
+export type TabType = 'chart' | 'pitch' | 'analytics' | 'pub' | 'proposals' | 'contested' | 'movers' | 'vulnerability' | 'rebase' | 'diff';
 
 interface NavigationProps {
   currentTab: TabType;
@@ -29,7 +31,9 @@ export const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const tabs = [
     { id: 'chart' as TabType, label: '15-Position Chart', icon: LayoutGrid },
-    { id: 'pub' as TabType, label: 'Pub Mode', icon: Smartphone, highlight: true },
+    { id: 'pitch' as TabType, label: 'Tactical Pitch', icon: Compass, highlight: true },
+    { id: 'analytics' as TabType, label: 'Analyst Charts', icon: LineChart },
+    { id: 'pub' as TabType, label: 'Pub Mode', icon: Smartphone },
     {
       id: 'proposals' as TabType,
       label: 'Debates & Votes',
@@ -58,7 +62,7 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 sticky top-[57px] z-20 shadow-xs">
-      <div className="max-w-7xl mx-auto flex items-center gap-1 sm:gap-2 overflow-x-auto py-2 no-scrollbar">
+      <div className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto no-scrollbar py-2">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = currentTab === tab.id;
@@ -67,17 +71,19 @@ export const Navigation: React.FC<NavigationProps> = ({
             <button
               key={tab.id}
               onClick={() => onSelectTab(tab.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold rounded-lg whitespace-nowrap transition-all ${
+              className={`flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold shrink-0 transition relative ${
                 isActive
-                  ? 'bg-[#0D6938] text-white shadow-xs shadow-emerald-900/10 dark:bg-emerald-600'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-[#0D6938] text-white shadow-xs'
+                  : tab.highlight
+                  ? 'text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : tab.highlight ? 'text-[#0D6938] dark:text-emerald-400' : 'text-slate-500'}`} />
+              <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
-              {tab.badge && (
+              {tab.badge !== undefined && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold leading-tight ${tab.badgeColor}`}
+                  className={`ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-extrabold ${tab.badgeColor}`}
                 >
                   {tab.badge}
                 </span>
