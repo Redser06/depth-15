@@ -288,4 +288,33 @@ describe('Stale & Inactive Starter Assignment Guard (SERIOUS 2)', () => {
     // The stale assignment must be reported in ignoredAssignments
     expect(resolved.ignoredAssignments).toContain("Peter O'Mahony");
   });
+
+  it('surfaces vacated shirt when an assignment consumes the sole option in a backrow ladder', () => {
+    const mockThreePositions: Position[] = [
+      { id: 6, num: '6', name: 'Blindside Flanker', abbr: 'BSF', group: 'Forwards' },
+      { id: 8, num: '8', name: 'Number Eight', abbr: 'N8', group: 'Forwards' },
+    ];
+
+    // Position 8 only has Caelan Doris and Jack Conan
+    // Position 6 has Jack Conan and Ryan Baird
+    const backrowLadder: Record<number, PlayerEntry[]> = {
+      6: [
+        { id: 'p-conan-6', name: 'Jack Conan', pos: 6, rating: 89, secondary: true, status: 'active', lastReviewed: 'Test' },
+        { id: 'p-baird-6', name: 'Ryan Baird', pos: 6, rating: 88, secondary: false, status: 'active', lastReviewed: 'Test' },
+      ],
+      8: [
+        { id: 'p-conan-8', name: 'Jack Conan', pos: 8, rating: 91, secondary: false, status: 'active', lastReviewed: 'Test' },
+      ],
+    };
+
+    // If Conan is forced to start at 6, and no other active contenders exist at 8:
+    const resolved = resolveStartingXV(backrowLadder, mockThreePositions, { 'Jack Conan': 6 });
+
+    expect(resolved.starters[6]?.name).toBe('Jack Conan');
+    expect(resolved.unresolvedPositions).toContain(8);
+    expect(resolved.starters[8]?.name).toBe('Unassigned / Vacant');
+    expect(resolved.starters[8]?.status).toBe('ineligible');
+    expect(resolved.resolvedStarterCount).toBe(1);
+    expect(resolved.totalPositions).toBe(2);
+  });
 });

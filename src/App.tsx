@@ -123,6 +123,7 @@ export const App: React.FC = () => {
               starterAssignments={store.starterAssignments}
               onAssignStarter={store.assignPlayerStarter}
               onStartDebate={handleStartSelectionDebate}
+              unresolvedPositions={store.resolvedSelection.unresolvedPositions}
             />
 
             {/* Overview Grid */}
@@ -190,6 +191,7 @@ export const App: React.FC = () => {
                   onAddPlayer={handleAddPlayer}
                   onOpenPubView={handleOpenPubView}
                   onReorderLadder={store.reorderPositionLadder}
+                  isVacant={store.resolvedSelection.unresolvedPositions.includes(pos.id)}
                 />
               ))}
             </div>
@@ -204,6 +206,7 @@ export const App: React.FC = () => {
               playersByPos={playersByPos}
               onSelectPosition={handleOpenPubView}
               onChallengePlayer={handleChallengePlayer}
+              unresolvedPositions={store.resolvedSelection.unresolvedPositions}
             />
           </div>
         )}
@@ -229,6 +232,7 @@ export const App: React.FC = () => {
               starterAssignments={store.starterAssignments}
               onAssignStarter={store.assignPlayerStarter}
               onStartDebate={handleStartSelectionDebate}
+              unresolvedPositions={store.resolvedSelection.unresolvedPositions}
             />
 
             <PubModeView
@@ -241,6 +245,7 @@ export const App: React.FC = () => {
               openProposals={openProposals}
               onViewProposal={handleViewProposal}
               onReorderLadder={store.reorderPositionLadder}
+              unresolvedPositions={store.resolvedSelection.unresolvedPositions}
             />
           </div>
         )}

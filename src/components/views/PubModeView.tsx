@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   PlusCircle,
   MessageSquare,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   DndContext,
@@ -38,6 +39,7 @@ interface PubModeViewProps {
   openProposals: Proposal[];
   onViewProposal: (proposal: Proposal) => void;
   onReorderLadder?: (posId: number, orderedPlayerIds: string[]) => void;
+  unresolvedPositions?: number[];
 }
 
 interface SortablePlayerRowProps {
@@ -89,11 +91,13 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
   openProposals,
   onViewProposal,
   onReorderLadder,
+  unresolvedPositions = [],
 }) => {
   const currentPos = positions.find((p) => p.id === selectedPosId) ?? positions[0]!;
   const players = playersByPos[currentPos.id] ?? [];
   const depth = calculateDepthScore(players);
   const band = getDepthBand(depth);
+  const isVacant = unresolvedPositions.includes(currentPos.id);
 
   const prevPos = () => {
     const nextId = selectedPosId === 1 ? 15 : selectedPosId - 1;
@@ -232,6 +236,21 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
             >
               Vote
             </button>
+          </div>
+        )}
+
+        {/* Vacated Shirt Warning in Pub Mode */}
+        {isVacant && (
+          <div className="mt-3 p-3 rounded-xl bg-amber-500/15 border border-amber-300 dark:border-amber-700/80 flex items-start gap-2.5">
+            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-extrabold text-xs text-amber-950 dark:text-amber-200">
+                ⚠ Position Shirt Vacant
+              </h4>
+              <p className="text-[11px] text-amber-900/90 dark:text-amber-300/90 mt-0.5">
+                Every contender in this position is currently starting in another shirt. No eligible #1 starter available.
+              </p>
+            </div>
           </div>
         )}
       </div>

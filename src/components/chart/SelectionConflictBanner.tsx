@@ -8,6 +8,7 @@ interface SelectionConflictBannerProps {
   starterAssignments: Record<string, number>;
   onAssignStarter: (playerName: string, posId: number) => void;
   onStartDebate?: (playerName: string, posId: number, rationale: string) => void;
+  unresolvedPositions?: number[];
 }
 
 export const SelectionConflictBanner: React.FC<SelectionConflictBannerProps> = ({
@@ -16,11 +17,27 @@ export const SelectionConflictBanner: React.FC<SelectionConflictBannerProps> = (
   starterAssignments,
   onAssignStarter,
   onStartDebate,
+  unresolvedPositions = [],
 }) => {
-  if (conflicts.length === 0) return null;
+  if (conflicts.length === 0 && unresolvedPositions.length === 0) return null;
 
   return (
     <div className="space-y-4">
+      {unresolvedPositions.length > 0 && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border-2 border-amber-400 dark:border-amber-600 flex items-start gap-3 shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center shrink-0 font-bold shadow-xs">
+            <AlertTriangle className="w-4 h-4" />
+          </div>
+          <div>
+            <h3 className="font-black text-sm text-amber-950 dark:text-amber-200">
+              Vacated Shirt Warning: {unresolvedPositions.length} position(s) have no eligible starter
+            </h3>
+            <p className="text-xs text-amber-900/90 dark:text-amber-300/90 mt-0.5">
+              Positions <strong>{unresolvedPositions.join(', ')}</strong> have no unassigned active contenders available to start. Check tactical assignments or promote a backup contender.
+            </p>
+          </div>
+        </div>
+      )}
       {conflicts.map((conflict) => {
         const tradeoff = tradeoffs.find(
           (t) => t.playerName.toLowerCase().trim() === conflict.playerName.toLowerCase().trim()

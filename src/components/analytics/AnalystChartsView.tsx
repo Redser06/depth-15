@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { Position, PlayerEntry } from '../../types/depth';
 import { calculateDepthScore, getDepthBand } from '../../lib/depthCalc';
 import { TacticalUnitDepth } from './tacticalFormation';
-import { TrendingDown, ShieldAlert, BarChart3, PieChart, Layers, ArrowUpRight } from 'lucide-react';
+import { SquadRadarView } from './SquadRadarView';
+import { TrendingDown, ShieldAlert, BarChart3, PieChart, Layers, ArrowUpRight, Activity } from 'lucide-react';
 
 interface AnalystChartsViewProps {
   positions: Position[];
@@ -15,7 +16,7 @@ export const AnalystChartsView: React.FC<AnalystChartsViewProps> = ({
   playersByPos,
   onSelectPosition,
 }) => {
-  const [activeTab, setActiveTab] = useState<'cliff' | 'units' | 'tiers'>('cliff');
+  const [activeTab, setActiveTab] = useState<'radar' | 'cliff' | 'units' | 'tiers'>('radar');
 
   // 1. Calculate cliff-edge data across all 15 positions
   const cliffData = positions.map((pos) => {
@@ -102,10 +103,21 @@ export const AnalystChartsView: React.FC<AnalystChartsViewProps> = ({
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl shrink-0 self-start sm:self-auto">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl shrink-0 self-start sm:self-auto overflow-x-auto max-w-full">
+          <button
+            onClick={() => setActiveTab('radar')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
+              activeTab === 'radar'
+                ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5 text-[#0D6938] dark:text-emerald-400" />
+            <span>Squad Radar</span>
+          </button>
           <button
             onClick={() => setActiveTab('cliff')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
               activeTab === 'cliff'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
@@ -116,7 +128,7 @@ export const AnalystChartsView: React.FC<AnalystChartsViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('units')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
               activeTab === 'units'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
@@ -127,7 +139,7 @@ export const AnalystChartsView: React.FC<AnalystChartsViewProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('tiers')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition shrink-0 ${
               activeTab === 'tiers'
                 ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
                 : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-200'
@@ -138,6 +150,17 @@ export const AnalystChartsView: React.FC<AnalystChartsViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* TAB 0: SQUAD STRENGTH RADAR GRAPH */}
+      {activeTab === 'radar' && (
+        <div className="animate-in fade-in duration-150">
+          <SquadRadarView
+            positions={positions}
+            playersByPos={playersByPos}
+            onSelectPosition={onSelectPosition}
+          />
+        </div>
+      )}
 
       {/* TAB 1: DROP-OFF CLIFF CHART */}
       {activeTab === 'cliff' && (

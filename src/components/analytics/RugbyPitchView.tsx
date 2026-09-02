@@ -9,6 +9,7 @@ interface RugbyPitchViewProps {
   playersByPos: Record<number, PlayerEntry[]>;
   onSelectPosition: (posId: number) => void;
   onChallengePlayer: (player: PlayerEntry) => void;
+  unresolvedPositions?: number[];
 }
 
 export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
@@ -16,6 +17,7 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
   playersByPos,
   onSelectPosition,
   onChallengePlayer,
+  unresolvedPositions = [],
 }) => {
   const [activePosId, setActivePosId] = useState<number | null>(null);
 
@@ -144,7 +146,8 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
               const depth = calculateDepthScore(players);
               const band = getDepthBand(depth);
               const isSelected = activePosId === pos.id;
-              const isFragile = depth < 70;
+              const isVacant = unresolvedPositions.includes(pos.id);
+              const isFragile = depth < 70 && !isVacant;
 
               return (
                 <div
@@ -161,13 +164,15 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
                     className={`group relative flex flex-col items-center focus:outline-hidden transition-transform active:scale-95 ${
                       isSelected ? 'scale-110 z-30' : 'hover:scale-105'
                     }`}
-                    title={`${pos.num}. ${pos.name}: ${starter ? starter.name : 'Unassigned'} (Depth: ${depth})`}
+                    title={`${pos.num}. ${pos.name}: ${isVacant ? 'VACANT' : starter ? starter.name : 'Unassigned'} (Depth: ${depth})`}
                   >
                     {/* Jersey / Circle Shield Node */}
                     <div
                       className={`relative w-11 h-11 sm:w-13 sm:h-13 rounded-2xl flex flex-col items-center justify-center font-bold text-white shadow-lg transition-all border-2 ${
                         isSelected
                           ? 'ring-4 ring-amber-400 border-white bg-slate-950 scale-105'
+                          : isVacant
+                          ? 'border-amber-400 bg-amber-950/90 ring-2 ring-amber-400 animate-pulse'
                           : isFragile
                           ? 'border-red-400 bg-slate-900/95 ring-2 ring-red-500/40'
                           : 'border-white/80 bg-[#0F1E36]/95 hover:border-amber-300'
@@ -179,24 +184,30 @@ export const RugbyPitchView: React.FC<RugbyPitchViewProps> = ({
                       </span>
 
                       {/* Starter Rating */}
-                      <span className="text-[10px] sm:text-[11px] font-extrabold font-mono text-emerald-400 mt-0.5 leading-none">
-                        {starter ? starter.rating : '—'}
+                      <span className={`text-[10px] sm:text-[11px] font-extrabold font-mono mt-0.5 leading-none ${
+                        isVacant ? 'text-amber-400' : 'text-emerald-400'
+                      }`}>
+                        {isVacant ? '0' : starter ? starter.rating : '—'}
                       </span>
 
                       {/* Depth Band Indicator Dot */}
                       <span
                         className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-slate-900 shadow-xs flex items-center justify-center text-[7px]"
-                        style={{ backgroundColor: band.color }}
-                        title={`Depth Score: ${depth} (${band.label})`}
+                        style={{ backgroundColor: isVacant ? '#f59e0b' : band.color }}
+                        title={isVacant ? 'Shirt Vacant' : `Depth Score: ${depth} (${band.label})`}
                       >
-                        {isFragile && <ShieldAlert className="w-2 h-2 text-white" />}
+                        {(isFragile || isVacant) && <ShieldAlert className="w-2 h-2 text-white" />}
                       </span>
                     </div>
 
                     {/* Compact Player Name Label Plaque */}
-                    <div className="mt-1 px-1.5 py-0.5 rounded-md bg-slate-950/85 backdrop-blur-xs border border-white/20 text-center max-w-[76px] sm:max-w-[95px] shadow-sm">
-                      <p className="text-[9px] sm:text-[10px] font-bold text-white truncate leading-tight">
-                        {starter ? starter.name.split(' ').pop() : 'Empty'}
+                    <div className={`mt-1 px-1.5 py-0.5 rounded-md backdrop-blur-xs border text-center max-w-[76px] sm:max-w-[95px] shadow-sm ${
+                      isVacant
+                        ? 'bg-amber-950/90 border-amber-400 text-amber-300 font-extrabold'
+                        : 'bg-slate-950/85 border-white/20 text-white'
+                    }`}>
+                      <p className="text-[9px] sm:text-[10px] font-bold truncate leading-tight">
+                        {isVacant ? '⚠ VACANT' : starter ? starter.name.split(' ').pop() : 'Empty'}
                       </p>
                       <p className="text-[8px] font-mono text-slate-300 truncate leading-none">
                         {pos.abbr}

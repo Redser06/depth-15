@@ -2,7 +2,7 @@ import React from 'react';
 import { Position, PlayerEntry } from '../../types/depth';
 import { calculateDepthScore, getDepthBand } from '../../lib/depthCalc';
 import { PlayerRow } from './PlayerRow';
-import { PlusCircle, ExternalLink } from 'lucide-react';
+import { PlusCircle, ExternalLink, AlertTriangle } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -29,6 +29,7 @@ interface PositionCardProps {
   onAddPlayer: (pos: Position) => void;
   onOpenPubView?: (posId: number) => void;
   onReorderLadder?: (posId: number, orderedPlayerIds: string[]) => void;
+  isVacant?: boolean;
 }
 
 interface SortablePlayerRowProps {
@@ -77,6 +78,7 @@ export const PositionCard: React.FC<PositionCardProps> = ({
   onAddPlayer,
   onOpenPubView,
   onReorderLadder,
+  isVacant = false,
 }) => {
   const depth = calculateDepthScore(players);
   const band = getDepthBand(depth);
@@ -111,10 +113,20 @@ export const PositionCard: React.FC<PositionCardProps> = ({
 
   return (
     <div className={`rounded-2xl border transition-all shadow-sm overflow-hidden flex flex-col ${
-      isVulnerable
+      isVacant
+        ? 'border-amber-400 dark:border-amber-500 bg-white dark:bg-slate-900 ring-2 ring-amber-400/30'
+        : isVulnerable
         ? 'border-red-300 dark:border-red-900 bg-white dark:bg-slate-900 ring-1 ring-red-400/20'
         : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300 dark:hover:border-slate-700'
     }`}>
+      {/* Vacant Shirt Warning Banner */}
+      {isVacant && (
+        <div className="bg-amber-500/15 border-b border-amber-300 dark:border-amber-700/80 px-3.5 py-2 flex items-center gap-2 text-xs font-bold text-amber-900 dark:text-amber-200">
+          <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <span>⚠ Shirt Vacant: No eligible starter — all contenders assigned elsewhere</span>
+        </div>
+      )}
+
       {/* Position Header Banner */}
       <div className="p-3.5 sm:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 bg-slate-50/70 dark:bg-slate-850/60">
         <div className="flex items-center gap-2.5 min-w-0">

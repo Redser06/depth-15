@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Proposal, Member, Position } from '../../types/depth';
 import { evaluateProposal } from '../../lib/consensusEngine';
-import { ThumbsUp, ThumbsDown, MessageSquare, Clock, CheckCircle2, XCircle, Send, ShieldCheck, Scale } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, MessageSquare, Clock, CheckCircle2, XCircle, Send, ShieldCheck, Scale, AlertCircle } from 'lucide-react';
 
 interface ProposalCardProps {
   proposal: Proposal;
@@ -71,7 +71,15 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
           <div className="flex items-center gap-1 font-bold">
             {proposal.status === 'passed' ? (
               <span className="flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" /> Passed ({proposal.resolvedValue})
+                <CheckCircle2 className="w-3.5 h-3.5" /> Passed ({
+                  typeof proposal.resolvedValue === 'number'
+                    ? proposal.resolvedValue
+                    : (proposal.type === 'retire'
+                        ? 'Retired'
+                        : proposal.type === 'reorder' || proposal.type === 'select_starter'
+                        ? 'Ladder Reordered'
+                        : (proposal.resolvedValue ?? 'Passed'))
+                })
               </span>
             ) : (
               <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
@@ -145,8 +153,28 @@ export const ProposalCard: React.FC<ProposalCardProps> = ({
           </div>
 
           <div className="text-[11px] text-slate-500 dark:text-slate-400">
-            {evaluation.summary}
+            {proposal.resolutionNote || evaluation.summary}
           </div>
+
+          {/* Dissent Transparency Banner (Passed with Dissent) */}
+          {proposal.status === 'passed' && evaluation.spread && (evaluation.spread.stdDev > 3 || (evaluation.spread.max - evaluation.spread.min >= 5) || evaluation.challenges > 0) && (
+            <div
+              data-testid="dissent-banner"
+              className="mt-2.5 p-2.5 rounded-xl bg-amber-500/10 border border-amber-300 dark:border-amber-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span className="font-bold text-amber-950 dark:text-amber-200">
+                  Passed with dissent — range {evaluation.spread.min}–{evaluation.spread.max} (stdDev ±{evaluation.spread.stdDev})
+                </span>
+              </div>
+              {evaluation.challenges > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-200 dark:bg-amber-900 text-amber-900 dark:text-amber-200 shrink-0 self-start sm:self-auto">
+                  {evaluation.challenges} challenge vote(s) recorded
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Voting Action Section (if still open) */}
