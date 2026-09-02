@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-canvas: #F8FAF8;
+    --bg-surface: #FFFFFF;
+    --bg-subtle: #F0F4F1;
+    --bg-hover: #E8F0EA;
+
+    --border-subtle: #E2E8F0;
+    --border-default: #CBD5E1;
+    --border-active: #0D6938;
+
+    --text-primary: #0F172A;
+    --text-secondary: #475569;
+    --text-muted: #64748B;
+
+    --accent-green: #0D6938;
+    --accent-green-light: #E8F5EE;
+    --accent-emerald: #16A34A;
+    --accent-navy: #0F1E36;
+    --accent-gold: #D97706;
+
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  }
+
+  .dark {
+    --bg-canvas: #090E17;
+    --bg-surface: #111927;
+    --bg-subtle: #182338;
+    --bg-hover: #1F2D48;
+
+    --border-subtle: #1E293B;
+    --border-default: #334155;
+    --border-active: #22C55E;
+
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+
+    --accent-green: #22C55E;
+    --accent-green-light: rgba(34, 197, 94, 0.15);
+    --accent-emerald: #4ADE80;
+    --accent-navy: #38BDF8;
+    --accent-gold: #F59E0B;
+  }
+
+  body {
+    background-color: var(--bg-canvas);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+  }
+}
+
+/* Custom Hatched Bar for Contested Ratings */
+.bar-contested {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #FEF3C7,
+    #FEF3C7 6px,
+    #FDE68A 6px,
+    #FDE68A 12px
+  );
+  border: 1px solid #F59E0B;
+}
+
+.dark .bar-contested {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #451A03,
+    #451A03 6px,
+    #78350F 6px,
+    #78350F 12px
+  );
+  border: 1px solid #D97706;
+}
+
+/* Subtle Irish Rugby Turf Pattern for Header Accents */
+.irish-turf-pattern {
+  background-color: #0D6938;
+  background-image: radial-gradient(#16A34A 0.75px, transparent 0.75px), radial-gradient(#16A34A 0.75px, #0D6938 0.75px);
+  background-size: 30px 30px;
+  background-position: 0 0, 15px 15px;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
