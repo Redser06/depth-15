@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "target": "depth15",
     "public": "dist",
     "ignore": [
       "firebase.json",

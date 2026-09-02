@@ -1,0 +1,47 @@
+name: CI & Preview Deploy
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  checks: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  test_and_preview:
+    name: Test, Build & Preview Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Typecheck
+        run: npm run typecheck
+
+      - name: Run Vitest Test Suite
+        run: npm test
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Deploy Preview Channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_RAPID_PROTOTYPING_4134C }}'
+          projectId: rapid-prototyping-4134c
+          target: depth15
+          expires: 7d
