@@ -5,6 +5,7 @@ import { Header } from './components/layout/Header';
 import { Navigation, TabType } from './components/layout/Navigation';
 import { OverviewGrid } from './components/chart/OverviewGrid';
 import { PositionCard } from './components/chart/PositionCard';
+import { SelectionConflictBanner } from './components/chart/SelectionConflictBanner';
 import { PubModeView } from './components/views/PubModeView';
 import { ProposalList } from './components/proposals/ProposalList';
 import { ProposalModal } from './components/proposals/ProposalModal';
@@ -15,7 +16,6 @@ import { SnapshotsDiffView } from './components/views/SnapshotsDiffView';
 import { RebaseWizard } from './components/rebase/RebaseWizard';
 import { RulesModal } from './components/views/RulesModal';
 import { PlayerEntry, Position, Proposal } from './types/depth';
-import { groupPlayersByPosition } from './lib/depthCalc';
 import { Search, RotateCcw } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -30,19 +30,23 @@ export const App: React.FC = () => {
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
   const [proposalTargetPlayer, setProposalTargetPlayer] = useState<PlayerEntry | undefined>();
   const [proposalTargetPosition, setProposalTargetPosition] = useState<Position | undefined>();
+  const [proposalRationale, setProposalRationale] = useState<string>('');
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
 
-  const playersByPos = groupPlayersByPosition(store.players, POSITIONS);
+  // Use the resolved ladders where every position has a distinct #1 starter
+  const playersByPos = store.resolvedSelection.adjustedLadders;
 
   const handleChallengePlayer = (player: PlayerEntry) => {
     setProposalTargetPlayer(player);
     setProposalTargetPosition(POSITIONS.find((p) => p.id === player.pos));
+    setProposalRationale('');
     setIsProposalModalOpen(true);
   };
 
   const handleAddPlayer = (pos: Position) => {
     setProposalTargetPlayer(undefined);
     setProposalTargetPosition(pos);
+    setProposalRationale('');
     setIsProposalModalOpen(true);
   };
 
@@ -53,6 +57,15 @@ export const App: React.FC = () => {
 
   const handleViewProposal = (_prop: Proposal) => {
     setCurrentTab('proposals');
+  };
+
+  const handleStartSelectionDebate = (playerName: string, posId: number, rationale: string) => {
+    const pos = POSITIONS.find((p) => p.id === posId);
+    const player = store.players.find((p) => p.name === playerName && p.pos === posId);
+    setProposalTargetPlayer(player);
+    setProposalTargetPosition(pos);
+    setProposalRationale(rationale);
+    setIsProposalModalOpen(true);
   };
 
   const openProposals = store.proposals.filter((p) => p.status === 'open');
@@ -101,6 +114,15 @@ export const App: React.FC = () => {
         {/* CHART VIEW */}
         {currentTab === 'chart' && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Selection Conflict & Opportunity Cost Banner */}
+            <SelectionConflictBanner
+              conflicts={store.resolvedSelection.conflicts}
+              tradeoffs={store.resolvedSelection.tradeoffs}
+              starterAssignments={store.starterAssignments}
+              onAssignStarter={store.assignPlayerStarter}
+              onStartDebate={handleStartSelectionDebate}
+            />
+
             {/* Overview Grid */}
             <OverviewGrid
               positions={POSITIONS}
@@ -155,7 +177,7 @@ export const App: React.FC = () => {
               </div>
             </div>
 
-            {/* 15 Position Cards Grid */}
+            {/* 15 Position Cards Grid (with Drag to Reorder) */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {displayedPositions.map((pos) => (
                 <PositionCard
@@ -165,6 +187,7 @@ export const App: React.FC = () => {
                   onChallengePlayer={handleChallengePlayer}
                   onAddPlayer={handleAddPlayer}
                   onOpenPubView={handleOpenPubView}
+                  onReorderLadder={store.reorderPositionLadder}
                 />
               ))}
             </div>
@@ -173,7 +196,16 @@ export const App: React.FC = () => {
 
         {/* PUB MODE VIEW */}
         {currentTab === 'pub' && (
-          <div className="animate-in fade-in duration-200">
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {/* Selection Conflict Banner in Pub Mode too */}
+            <SelectionConflictBanner
+              conflicts={store.resolvedSelection.conflicts}
+              tradeoffs={store.resolvedSelection.tradeoffs}
+              starterAssignments={store.starterAssignments}
+              onAssignStarter={store.assignPlayerStarter}
+              onStartDebate={handleStartSelectionDebate}
+            />
+
             <PubModeView
               positions={POSITIONS}
               playersByPos={playersByPos}
@@ -183,6 +215,7 @@ export const App: React.FC = () => {
               onAddPlayer={handleAddPlayer}
               openProposals={openProposals}
               onViewProposal={handleViewProposal}
+              onReorderLadder={store.reorderPositionLadder}
             />
           </div>
         )}
@@ -301,6 +334,7 @@ export const App: React.FC = () => {
         targetPlayer={proposalTargetPlayer}
         targetPosition={proposalTargetPosition}
         positions={POSITIONS}
+        initialRationale={proposalRationale}
         onSubmit={store.createProposal}
       />
 

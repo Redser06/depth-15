@@ -8,6 +8,7 @@ interface ProposalModalProps {
   targetPlayer?: PlayerEntry;
   targetPosition?: Position;
   positions: Position[];
+  initialRationale?: string;
   onSubmit: (data: {
     type: ProposalType;
     targetPlayerName: string;
@@ -24,6 +25,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
   targetPlayer,
   targetPosition,
   positions,
+  initialRationale = '',
   onSubmit,
 }) => {
   if (!isOpen) return null;
@@ -32,7 +34,7 @@ export const ProposalModal: React.FC<ProposalModalProps> = ({
   const [selectedPos, setSelectedPos] = useState<number>(targetPosition?.id ?? targetPlayer?.pos ?? 10);
   const [playerName, setPlayerName] = useState<string>(targetPlayer?.name ?? '');
   const [proposedRating, setProposedRating] = useState<number>(targetPlayer?.rating ?? 80);
-  const [rationale, setRationale] = useState<string>('');
+  const [rationale, setRationale] = useState<string>(initialRationale);
   const [error, setError] = useState<string | null>(null);
 
   const MIN_CHARS = 140;

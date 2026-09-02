@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Position, PlayerEntry, Proposal } from '../../types/depth';
 import { calculateDepthScore, getDepthBand } from '../../lib/depthCalc';
 import { PlayerRow } from '../chart/PlayerRow';
@@ -13,6 +13,7 @@ interface PubModeViewProps {
   onAddPlayer: (pos: Position) => void;
   openProposals: Proposal[];
   onViewProposal: (prop: Proposal) => void;
+  onReorderLadder?: (posId: number, playerIds: string[]) => void;
 }
 
 export const PubModeView: React.FC<PubModeViewProps> = ({
@@ -24,7 +25,10 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
   onAddPlayer,
   openProposals,
   onViewProposal,
+  onReorderLadder,
 }) => {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
   const currentPos = positions.find((p) => p.id === selectedPosId) ?? positions[0]!;
   const players = playersByPos[currentPos.id] ?? [];
   const depth = calculateDepthScore(players);
@@ -41,6 +45,45 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
   };
 
   const posProposals = openProposals.filter((p) => p.pos === currentPos.id);
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', `${index}`);
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = draggedIndex ?? Number(e.dataTransfer.getData('text/plain'));
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex || !onReorderLadder) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    const reordered = [...players];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    if (moved) {
+      reordered.splice(targetIndex, 0, moved);
+      onReorderLadder(currentPos.id, reordered.map((p) => p.id));
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    if (!onReorderLadder) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= players.length) return;
+
+    const reordered = [...players];
+    const temp = reordered[index]!;
+    reordered[index] = reordered[targetIndex]!;
+    reordered[targetIndex] = temp;
+
+    onReorderLadder(currentPos.id, reordered.map((p) => p.id));
+  };
 
   return (
     <div className="max-w-xl mx-auto space-y-4">
@@ -100,7 +143,7 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Ranked ladder &amp; consensus quality ratings
+              Ranked ladder &amp; consensus quality ratings (drag to rank)
             </p>
           </div>
 
@@ -144,11 +187,11 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
         )}
       </div>
 
-      {/* Players Ladder List */}
+      {/* Players Ladder List with Drag and Drop */}
       <div className="space-y-2">
         <div className="flex items-center justify-between px-1">
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            Position Ladder ({players.length})
+            Position Ladder ({players.length}) — Drag to Rank
           </span>
           <button
             onClick={() => onAddPlayer(currentPos)}
@@ -165,6 +208,14 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
             player={player}
             rank={idx + 1}
             onChallenge={onChallengePlayer}
+            isDraggable={Boolean(onReorderLadder)}
+            onDragStart={(e) => handleDragStart(e, idx)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, idx)}
+            canMoveUp={idx > 0}
+            canMoveDown={idx < players.length - 1}
+            onMoveUp={() => handleMove(idx, 'up')}
+            onMoveDown={() => handleMove(idx, 'down')}
           />
         ))}
       </div>

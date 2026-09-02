@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Position, PlayerEntry } from '../../types/depth';
 import { calculateDepthScore, getDepthBand } from '../../lib/depthCalc';
 import { PlayerRow } from './PlayerRow';
@@ -10,6 +10,7 @@ interface PositionCardProps {
   onChallengePlayer: (player: PlayerEntry) => void;
   onAddPlayer: (pos: Position) => void;
   onOpenPubView: (posId: number) => void;
+  onReorderLadder?: (posId: number, playerIds: string[]) => void;
 }
 
 export const PositionCard: React.FC<PositionCardProps> = ({
@@ -18,10 +19,52 @@ export const PositionCard: React.FC<PositionCardProps> = ({
   onChallengePlayer,
   onAddPlayer,
   onOpenPubView,
+  onReorderLadder,
 }) => {
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+
   const depth = calculateDepthScore(players);
   const band = getDepthBand(depth);
   const isVulnerable = depth < 70;
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    e.dataTransfer.setData('text/plain', `${index}`);
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    const sourceIndex = draggedIndex ?? Number(e.dataTransfer.getData('text/plain'));
+    if (isNaN(sourceIndex) || sourceIndex === targetIndex || !onReorderLadder) {
+      setDraggedIndex(null);
+      return;
+    }
+
+    const reordered = [...players];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    if (moved) {
+      reordered.splice(targetIndex, 0, moved);
+      onReorderLadder(position.id, reordered.map((p) => p.id));
+    }
+    setDraggedIndex(null);
+  };
+
+  const handleMove = (index: number, direction: 'up' | 'down') => {
+    if (!onReorderLadder) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= players.length) return;
+
+    const reordered = [...players];
+    const temp = reordered[index]!;
+    reordered[index] = reordered[targetIndex]!;
+    reordered[targetIndex] = temp;
+
+    onReorderLadder(position.id, reordered.map((p) => p.id));
+  };
 
   return (
     <div className={`rounded-2xl border transition-all shadow-sm overflow-hidden flex flex-col ${
@@ -90,7 +133,7 @@ export const PositionCard: React.FC<PositionCardProps> = ({
         />
       </div>
 
-      {/* Players Ladder */}
+      {/* Players Ladder (Drag and Drop Supported) */}
       <div className="p-3 sm:p-3.5 flex-1 flex flex-col gap-2">
         {players.length === 0 ? (
           <div className="py-8 text-center text-xs text-slate-400">
@@ -103,6 +146,14 @@ export const PositionCard: React.FC<PositionCardProps> = ({
               player={player}
               rank={idx + 1}
               onChallenge={onChallengePlayer}
+              isDraggable={Boolean(onReorderLadder)}
+              onDragStart={(e) => handleDragStart(e, idx)}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, idx)}
+              canMoveUp={idx > 0}
+              canMoveDown={idx < players.length - 1}
+              onMoveUp={() => handleMove(idx, 'up')}
+              onMoveDown={() => handleMove(idx, 'down')}
             />
           ))
         )}
@@ -111,7 +162,7 @@ export const PositionCard: React.FC<PositionCardProps> = ({
       {/* Footer / Quick Add */}
       <div className="p-2.5 bg-slate-50 dark:bg-slate-850/40 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
         <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
-          {players.length} contenders listed
+          {players.length} contenders listed (drag to rank)
         </span>
 
         <button

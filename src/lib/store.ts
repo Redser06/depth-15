@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant } from '../types/depth';
-import { BASELINE_PLAYERS, IMMUTABLE_2025_SNAPSHOT } from '../data/baseline2025';
+import { BASELINE_PLAYERS, IMMUTABLE_2025_SNAPSHOT, POSITIONS } from '../data/baseline2025';
 import { DEFAULT_MEMBERS, DEFAULT_GROUP_CODE } from '../data/defaultMembers';
 import { evaluateProposal } from './consensusEngine';
+import { resolveStartingXV } from './selectionRules';
+import { groupPlayersByPosition } from './depthCalc';
 
 const STORAGE_KEYS = {
   PLAYERS: 'depth15_players_v1',
@@ -11,6 +13,8 @@ const STORAGE_KEYS = {
   ACTIVE_MEMBER: 'depth15_active_member_v1',
   REBASE: 'depth15_rebase_v1',
   DARK_MODE: 'depth15_dark_mode_v1',
+  STARTER_ASSIGNMENTS: 'depth15_starters_v1',
+  POSITION_ORDERS: 'depth15_orders_v1',
 };
 
 // Seed initial realistic debate proposals so app is immediately rich with live pub discussion
@@ -200,6 +204,45 @@ export function useDepthStore() {
     return false; // Default bright light mode per user instruction!
   });
 
+  // Starter assignments state (for players with conflicts or manual preference)
+  const [starterAssignments, setStarterAssignments] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.STARTER_ASSIGNMENTS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return {};
+  });
+
+  // Custom rank-ordered position ladders
+  const [positionOrders, setPositionOrders] = useState<Record<number, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.POSITION_ORDERS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return {};
+  });
+
+  // Sync starter assignments & position orders
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.STARTER_ASSIGNMENTS, JSON.stringify(starterAssignments));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [starterAssignments]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.POSITION_ORDERS, JSON.stringify(positionOrders));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [positionOrders]);
+
   // Sync with localStorage
   useEffect(() => {
     try {
@@ -255,6 +298,59 @@ export function useDepthStore() {
   }, [darkMode]);
 
   const activeMember = DEFAULT_MEMBERS.find(m => m.id === activeMemberId) ?? DEFAULT_MEMBERS[0]!;
+
+  // 1. Group active players by position
+  const rawPlayersByPos = useMemo(() => {
+    return groupPlayersByPosition(players, POSITIONS);
+  }, [players]);
+
+  // 2. Apply drag-and-drop custom order if set
+  const orderedPlayersByPos = useMemo(() => {
+    const result: Record<number, PlayerEntry[]> = {};
+    POSITIONS.forEach(pos => {
+      const originalList = rawPlayersByPos[pos.id] ?? [];
+      const order = positionOrders[pos.id];
+      if (order && order.length > 0) {
+        const orderMap = new Map(order.map((id, idx) => [id, idx]));
+        result[pos.id] = [...originalList].sort((a, b) => {
+          const idxA = orderMap.get(a.id) ?? 999;
+          const idxB = orderMap.get(b.id) ?? 999;
+          return idxA - idxB;
+        });
+      } else {
+        result[pos.id] = originalList;
+      }
+    });
+    return result;
+  }, [rawPlayersByPos, positionOrders]);
+
+  // 3. Resolve starting XV and detect conflicts/tradeoffs
+  const resolvedSelection = useMemo(() => {
+    return resolveStartingXV(orderedPlayersByPos, POSITIONS, starterAssignments);
+  }, [orderedPlayersByPos, starterAssignments]);
+
+  const reorderPositionLadder = useCallback((posId: number, orderedPlayerIds: string[]) => {
+    setPositionOrders(prev => ({
+      ...prev,
+      [posId]: orderedPlayerIds,
+    }));
+    // If the top player changed, make sure they are recorded as starter for this position
+    const topPlayerId = orderedPlayerIds[0];
+    const topPlayer = players.find(p => p.id === topPlayerId && p.pos === posId);
+    if (topPlayer) {
+      setStarterAssignments(prev => ({
+        ...prev,
+        [topPlayer.name]: posId,
+      }));
+    }
+  }, [players]);
+
+  const assignPlayerStarter = useCallback((playerName: string, posId: number) => {
+    setStarterAssignments(prev => ({
+      ...prev,
+      [playerName]: posId,
+    }));
+  }, []);
 
   // Actions
   const createProposal = useCallback((data: {
@@ -578,6 +674,8 @@ export function useDepthStore() {
       gate2Entrants: [],
       gate3PositionsReviewed: {},
     });
+    setStarterAssignments({});
+    setPositionOrders({});
     setDarkMode(false);
   }, []);
 
@@ -592,6 +690,11 @@ export function useDepthStore() {
     darkMode,
     setDarkMode,
     setActiveMemberId,
+    starterAssignments,
+    positionOrders,
+    resolvedSelection,
+    reorderPositionLadder,
+    assignPlayerStarter,
     createProposal,
     castVote,
     addComment,

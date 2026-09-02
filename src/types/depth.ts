@@ -32,9 +32,10 @@ export interface PlayerEntry {
   isContested?: boolean;
   disputeCount?: number;
   rolledOver?: boolean;
+  startsAtOtherPos?: number; // Indicates this player is selected as #1 starter in another position
 }
 
-export type ProposalType = 'rerate' | 'reorder' | 'add_player' | 'retire' | 'add_secondary';
+export type ProposalType = 'rerate' | 'reorder' | 'add_player' | 'retire' | 'add_secondary' | 'select_starter';
 
 export type ProposalStatus = 'open' | 'passed' | 'failed' | 'cancelled';
 
@@ -117,4 +118,40 @@ export interface RebaseSession {
   gate1Attrition: Record<string, { action: 'keep' | 'retire' | 'ineligible'; reason?: string }>;
   gate2Entrants: Gate2Entrant[];
   gate3PositionsReviewed: Record<number, boolean>;
+}
+
+// Starter Selection & Tactical Conflict Types
+export interface StarterConflict {
+  playerName: string;
+  positions: Array<{ posId: number; posName: string; rating: number; isPrimary: boolean }>;
+  currentAssignedPos: number;
+}
+
+export interface TacticalOption {
+  assignedPos: number;
+  posName: string;
+  playerRatingAtPos: number;
+  alternativePos: number;
+  alternativePosName: string;
+  backupStarterName: string;
+  backupStarterRating: number;
+  backupDropoff: number; // gap between player rating at alternative pos and backup
+  combinedScore: number; // playerRatingAtPos + backupStarterRating
+  summary: string;
+}
+
+export interface TacticalTradeoff {
+  playerName: string;
+  options: TacticalOption[];
+  bestOptionPos: number;
+  netDelta: number;
+  explanation: string;
+}
+
+export interface ResolvedSquadSelection {
+  starters: Record<number, PlayerEntry>;
+  adjustedLadders: Record<number, PlayerEntry[]>;
+  conflicts: StarterConflict[];
+  tradeoffs: TacticalTradeoff[];
+  startingXVAverageRating: number;
 }
