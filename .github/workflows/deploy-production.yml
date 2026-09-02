@@ -35,7 +35,7 @@ jobs:
       - name: Run Typecheck
         run: npm run typecheck
 
-      - name: Run Vitest Test Suite (42 Tests, including Card-Matches-Maths Integration)
+      - name: Run Vitest Test Suite (43 Tests, including Honest Radar Data-Integrity Probe)
         run: npm test
 
       - name: Build Application

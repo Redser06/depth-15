@@ -25,6 +25,8 @@
      7. Back Three Aerial & Strike (11, 14 & 15)
    - Balanced unit scoring: 60% Starter Class + 40% Succession Depth Resilience.
    - Concentric benchmark rings at 50, 70, 80 (International), 90 (World Class), and 100.
+   - **Honest Data Integrity**: Zero fabricated sentinel values (`50`, `0`). Any unit with absent active contenders renders a hollow `"No data"` vertex and is excluded from the Overall Index with the exact measured denominator disclosed (e.g. `6/7 measured units`).
+   - **Mobile Layout**: Responsive viewBox margins (`-45 -20 610 520`) preventing outer spoke label collisions on mobile screens.
    - Tap any vertex or unit card to inspect starters, backups, depth ratings, and tactical commentary.
 
 2. **Vacated Shirts Visibly Surfaced Across All UI Views**
@@ -64,7 +66,7 @@
    - Passed proposals apply verified state mutations (retirements set status to `retired` and purge starter assignments; re-rates update spread; additions insert contenders).
 
 10. **Automated CI/CD Pipeline (GitHub Actions)**
-    - **Pull Request CI (`preview.yml`)**: Runs typechecks, 42 Vitest tests, builds, and provisions a 7-day Firebase preview channel.
+    - **Pull Request CI (`preview.yml`)**: Runs typechecks, 43 Vitest tests, builds, and provisions a 7-day Firebase preview channel.
     - **Production CD (`deploy-production.yml`)**: Automatically tests, builds, and deploys merges to `main` straight to `https://depth-15.web.app`.
 
 ---
@@ -75,7 +77,7 @@
 - **Framework:** React 18 + TypeScript + Vite
 - **Styling:** Tailwind CSS + Lucide Icons + Canvas Confetti
 - **Gestures:** `@dnd-kit/core` & `@dnd-kit/sortable` (Touch & Pointer Sensors)
-- **Testing:** Vitest + React Testing Library + JSDOM (42 tests: selection engine, 1:1 consensus math, adversarial probes, vacated ladders, radar geometry, card-matches-maths integration)
+- **Testing:** Vitest + React Testing Library + JSDOM (43 tests: selection engine, 1:1 consensus math, adversarial probes, vacated ladders, honest radar data-integrity probe, card-matches-maths integration)
 - **CI/CD:** GitHub Actions + Firebase Extended Hosting Action
 - **Hosting:** Firebase Hosting Multi-site (`depth-15`)
 
@@ -83,7 +85,7 @@
 # Development server
 npm run dev
 
-# Run Vitest test suite (42 tests)
+# Run Vitest test suite (43 tests)
 npm test
 
 # Typecheck and build
