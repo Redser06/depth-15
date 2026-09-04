@@ -7,7 +7,7 @@ import {
   DndContext,
   closestCenter,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
@@ -43,7 +43,7 @@ interface SortablePlayerRowProps {
   onMoveDown: () => void;
 }
 
-const SortablePlayerRow: React.FC<SortablePlayerRowProps> = ({ player, ...rest }) => {
+const SortablePlayerRow: React.FC<SortablePlayerRowProps> = ({ player, isDraggable, ...rest }) => {
   const {
     attributes,
     listeners,
@@ -51,7 +51,7 @@ const SortablePlayerRow: React.FC<SortablePlayerRowProps> = ({ player, ...rest }
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: player.id });
+  } = useSortable({ id: player.id, disabled: !isDraggable });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -61,11 +61,17 @@ const SortablePlayerRow: React.FC<SortablePlayerRowProps> = ({ player, ...rest }
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...(isDraggable ? attributes : {})}
+      {...(isDraggable ? listeners : {})}
+      className={isDraggable ? 'touch-manipulation' : ''}
+    >
       <PlayerRow
         {...rest}
         player={player}
-        dragHandleProps={{ ...attributes, ...listeners }}
+        isDraggable={isDraggable}
       />
     </div>
   );
@@ -85,8 +91,8 @@ export const PositionCard: React.FC<PositionCardProps> = ({
   const isVulnerable = depth < 70;
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 100, tolerance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 

@@ -35,7 +35,7 @@ jobs:
       - name: Run Typecheck
         run: npm run typecheck
 
-      - name: Run Vitest Test Suite (47 Tests, including Mobile Ergonomics & Boundary Invariants)
+      - name: Run Vitest Test Suite (48 Tests, including Card-Handle Drag & Reorder Invariants)
         run: npm test
 
       - name: Build Application

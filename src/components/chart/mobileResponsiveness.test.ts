@@ -42,4 +42,22 @@ describe('Mobile Ergonomics & Responsive Boundary Invariants', () => {
       });
     });
   });
+
+  it('ensures resolveStartingXV strictly preserves custom drag-and-drop ladder orders', async () => {
+    const { resolveStartingXV } = await import('../../lib/selectionRules');
+    const { groupPlayersByPosition } = await import('../../lib/depthCalc');
+
+    const defaultLadders = groupPlayersByPosition(BASELINE_PLAYERS, POSITIONS);
+    const pos10 = defaultLadders[10]!;
+    expect(pos10[0]!.name).toBe('Jack Crowley');
+
+    // Simulate custom drag-to-rank: swap Crowley and Prendergast
+    const reorderedPos10 = [pos10[1]!, pos10[0]!, ...pos10.slice(2)];
+    const customLadders = { ...defaultLadders, 10: reorderedPos10 };
+
+    const resolved = resolveStartingXV(customLadders, POSITIONS, { 'Sam Prendergast': 10 });
+    expect(resolved.starters[10]!.name).toBe('Sam Prendergast');
+    expect(resolved.adjustedLadders[10]![0]!.name).toBe('Sam Prendergast');
+    expect(resolved.adjustedLadders[10]![1]!.name).toBe('Jack Crowley');
+  });
 });

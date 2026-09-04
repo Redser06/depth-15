@@ -271,12 +271,7 @@ export function resolveStartingXV(
       }
     });
 
-    // Sort eligible starters descending by rating
-    eligibleToStart.sort((a, b) => b.rating - a.rating);
-    // Sort elsewhere starters descending by rating
-    startsElsewhere.sort((a, b) => b.rating - a.rating);
-
-    // The starter is the top eligible player
+    // The starter is the top eligible player in the incoming ladder order
     const starter = eligibleToStart[0];
     if (starter) {
       starters[pos.id] = starter;
@@ -294,11 +289,11 @@ export function resolveStartingXV(
       };
     }
 
-    // Combine ladder: starter first, then remaining eligible players and cover players ranked by rating
+    // Combine ladder: starter first, then remaining eligible players and cover players in order
     const remainingEligible = eligibleToStart.slice(1);
-    const coverLadder = [...remainingEligible, ...startsElsewhere].sort((a, b) => b.rating - a.rating);
-
-    adjustedLadders[pos.id] = starter ? [starter, ...coverLadder] : coverLadder;
+    adjustedLadders[pos.id] = starter
+      ? [starter, ...remainingEligible, ...startsElsewhere]
+      : [...remainingEligible, ...startsElsewhere];
   });
 
   // Calculate Starting XV average rating strictly over resolved active starters

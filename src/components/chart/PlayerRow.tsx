@@ -10,14 +10,10 @@ interface PlayerRowProps {
   onChallenge: (player: PlayerEntry) => void;
   compact?: boolean;
   isDraggable?: boolean;
-  onDragStart?: (e: React.DragEvent) => void;
-  onDragOver?: (e: React.DragEvent) => void;
-  onDrop?: (e: React.DragEvent) => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
-  dragHandleProps?: Record<string, any>;
 }
 
 export const PlayerRow: React.FC<PlayerRowProps> = ({
@@ -26,14 +22,10 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
   onChallenge,
   compact = false,
   isDraggable = false,
-  onDragStart,
-  onDragOver,
-  onDrop,
   onMoveUp,
   onMoveDown,
   canMoveUp = false,
   canMoveDown = false,
-  dragHandleProps,
 }) => {
   const { tier, pillClass, badgeColor } = getRatingTier(player.rating);
 
@@ -59,20 +51,15 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
   if (compact) {
     return (
       <div
-        draggable={isDraggable}
-        onDragStart={onDragStart}
-        onDragOver={onDragOver}
-        onDrop={onDrop}
-        className="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition group cursor-grab active:cursor-grabbing"
+        className="flex items-center justify-between py-2 px-2.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition group select-none cursor-grab active:cursor-grabbing"
       >
         <div className="flex items-center gap-2 min-w-0">
           {isDraggable && (
             <div
-              {...dragHandleProps}
-              className="touch-none cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="p-0.5 rounded text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 shrink-0"
               title="Drag to reorder ladder"
             >
-              <GripVertical className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 shrink-0" />
+              <GripVertical className="w-3.5 h-3.5" />
             </div>
           )}
           <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold ${rankBg}`}>
@@ -117,11 +104,9 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
 
   return (
     <div
-      draggable={isDraggable}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
-      className={`p-3 rounded-xl border transition-all relative group ${
+      className={`p-3 rounded-xl border transition-all relative group select-none ${
+        isDraggable ? 'cursor-grab active:cursor-grabbing' : ''
+      } ${
         player.isContested
           ? 'border-amber-300 dark:border-amber-700/80 bg-amber-50/40 dark:bg-amber-950/10'
           : player.startsAtOtherPos
@@ -130,15 +115,14 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        {/* Left: Drag Handle, Rank, Name & Tags */}
+        {/* Left: Drag Handle visual affordance, Rank, Name & Tags */}
         <div className="flex items-start gap-2 min-w-0">
-          {/* Drag Handle & Up/Down Steppers */}
+          {/* Visual Grip Icon & Stepper Buttons */}
           {isDraggable && (
             <div className="flex items-center gap-1 shrink-0 mt-0.5">
               <div
-                {...dragHandleProps}
-                className="touch-none cursor-grab active:cursor-grabbing p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 active:text-[#0D6938]"
-                title="Drag to reorder ladder"
+                className="p-1.5 rounded-lg text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 active:text-[#0D6938]"
+                title="Drag whole card to reorder ladder"
               >
                 <GripVertical className="w-4 h-4" />
               </div>
@@ -151,7 +135,9 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
                         e.stopPropagation();
                         onMoveUp();
                       }}
-                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 p-1 sm:p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition active:scale-90 touch-manipulation"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 p-1 sm:p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition active:scale-90 touch-manipulation cursor-pointer"
                       title="Move up rank"
                       aria-label="Move player up"
                     >
@@ -164,7 +150,9 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
                         e.stopPropagation();
                         onMoveDown();
                       }}
-                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 p-1 sm:p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition active:scale-90 touch-manipulation"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 p-1 sm:p-0.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition active:scale-90 touch-manipulation cursor-pointer"
                       title="Move down rank"
                       aria-label="Move player down"
                     >
@@ -236,8 +224,13 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
           </div>
 
           <button
-            onClick={() => onChallenge(player)}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 transition shadow-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChallenge(player);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 transition shadow-xs cursor-pointer"
             title="Propose a rating change or challenge"
           >
             <MessageSquarePlus className="w-3 h-3" />
