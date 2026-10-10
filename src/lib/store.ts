@@ -609,13 +609,33 @@ export function useDepthStore() {
     }));
   }, []);
 
+  const recordGate1Batch = useCallback((playerNames: string[], action: 'keep' | 'retire' | 'ineligible', reason?: string) => {
+    setRebaseSession(prev => {
+      const updated = { ...prev.gate1Attrition };
+      playerNames.forEach(name => {
+        updated[name] = { action, reason };
+      });
+      return {
+        ...prev,
+        gate1Attrition: updated,
+      };
+    });
+  }, []);
+
   const addGate2Entrant = useCallback((entrant: Omit<Gate2Entrant, 'id'>) => {
     setRebaseSession(prev => ({
       ...prev,
       gate2Entrants: [
         ...prev.gate2Entrants,
-        { ...entrant, id: `entrant-${Date.now()}` }
+        { ...entrant, id: `entrant-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }
       ]
+    }));
+  }, []);
+
+  const removeGate2Entrant = useCallback((entrantId: string) => {
+    setRebaseSession(prev => ({
+      ...prev,
+      gate2Entrants: prev.gate2Entrants.filter(e => e.id !== entrantId),
     }));
   }, []);
 
@@ -627,6 +647,19 @@ export function useDepthStore() {
         [posId]: true
       }
     }));
+  }, []);
+
+  const markAllGate3Positions = useCallback(() => {
+    setRebaseSession(prev => {
+      const all: Record<number, boolean> = {};
+      POSITIONS.forEach(p => {
+        all[p.id] = true;
+      });
+      return {
+        ...prev,
+        gate3PositionsReviewed: all,
+      };
+    });
   }, []);
 
   const completeRebaseSignoff = useCallback((versionTitle: string, notes?: string) => {
@@ -682,14 +715,14 @@ export function useDepthStore() {
       return p;
     });
 
-    // Purge any retired players from starter assignments
-    const retiredNames = new Set(
-      updated.filter(p => p.status === 'retired').map(p => p.name.toLowerCase().trim())
+    // Purge any retired or ineligible players from starter assignments
+    const inactiveNames = new Set(
+      updated.filter(p => p.status === 'retired' || p.status === 'ineligible').map(p => p.name.toLowerCase().trim())
     );
     setStarterAssignments(prev => {
       const next = { ...prev };
       Object.keys(next).forEach(k => {
-        if (retiredNames.has(k.toLowerCase().trim())) {
+        if (inactiveNames.has(k.toLowerCase().trim())) {
           delete next[k];
         }
       });
@@ -771,8 +804,11 @@ export function useDepthStore() {
     openRebase,
     setGate,
     recordGate1,
+    recordGate1Batch,
     addGate2Entrant,
+    removeGate2Entrant,
     markGate3Position,
+    markAllGate3Positions,
     completeRebaseSignoff,
     resetAllToBaseline,
   };

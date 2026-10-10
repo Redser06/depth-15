@@ -317,8 +317,11 @@ export const App: React.FC = () => {
               onOpenRebase={store.openRebase}
               onSetGate={store.setGate}
               onRecordGate1={store.recordGate1}
+              onRecordGate1Batch={store.recordGate1Batch}
               onAddGate2Entrant={store.addGate2Entrant}
+              onRemoveGate2Entrant={store.removeGate2Entrant}
               onMarkGate3Position={store.markGate3Position}
+              onMarkAllGate3Positions={store.markAllGate3Positions}
               onCompleteSignoff={store.completeRebaseSignoff}
             />
           </div>
