@@ -93,6 +93,19 @@ export function evaluateProposal(
       };
     }
 
+    if (proposal.type === 'transfer') {
+      return {
+        canResolve: true,
+        quorumMet: true,
+        supports,
+        challenges,
+        status: 'passed',
+        proposalType: proposal.type,
+        resolvedAction: 'transfer',
+        summary: `Passed: Transfer of ${proposal.targetPlayerName} to ${proposal.province ?? proposal.proposedValue} approved by majority (${supports} vs ${challenges}).`,
+      };
+    }
+
     // For numeric proposals ('rerate', 'add_player', 'add_secondary'):
     // Build value pool with strict 1:1 mathematical integrity:
     // Exactly one value per vote (the vote's counterValue ?? proposedValue for support,

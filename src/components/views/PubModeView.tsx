@@ -35,6 +35,7 @@ interface PubModeViewProps {
   selectedPosId: number;
   onSelectPosId: (posId: number) => void;
   onChallengePlayer: (player: PlayerEntry) => void;
+  onTransferPlayer?: (player: PlayerEntry) => void;
   onAddPlayer: (pos: Position) => void;
   openProposals: Proposal[];
   onViewProposal: (proposal: Proposal) => void;
@@ -46,6 +47,7 @@ interface SortablePlayerRowProps {
   player: PlayerEntry;
   rank: number;
   onChallenge: (player: PlayerEntry) => void;
+  onTransfer?: (player: PlayerEntry) => void;
   isDraggable: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -93,6 +95,7 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
   selectedPosId,
   onSelectPosId,
   onChallengePlayer,
+  onTransferPlayer,
   onAddPlayer,
   openProposals,
   onViewProposal,
@@ -289,6 +292,7 @@ export const PubModeView: React.FC<PubModeViewProps> = ({
                   player={player}
                   rank={idx + 1}
                   onChallenge={onChallengePlayer}
+                  onTransfer={onTransferPlayer}
                   isDraggable={Boolean(onReorderLadder)}
                   canMoveUp={idx > 0}
                   canMoveDown={idx < players.length - 1}

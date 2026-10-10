@@ -2,12 +2,13 @@ import React from 'react';
 import { PlayerEntry } from '../../types/depth';
 import { getRatingTier } from '../../lib/depthCalc';
 import { SpreadBar } from './SpreadBar';
-import { MessageSquarePlus, GripVertical, ChevronUp, ChevronDown, Shield } from 'lucide-react';
+import { MessageSquarePlus, GripVertical, ChevronUp, ChevronDown, Shield, ArrowRightLeft } from 'lucide-react';
 
 interface PlayerRowProps {
   player: PlayerEntry;
   rank: number;
   onChallenge: (player: PlayerEntry) => void;
+  onTransfer?: (player: PlayerEntry) => void;
   compact?: boolean;
   isDraggable?: boolean;
   onMoveUp?: () => void;
@@ -20,6 +21,7 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
   player,
   rank,
   onChallenge,
+  onTransfer,
   compact = false,
   isDraggable = false,
   onMoveUp,
@@ -187,9 +189,26 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
                 </span>
               )}
               {player.province && (
-                <span className={`px-1.5 py-0.2 rounded text-[10px] font-medium border ${provincePill}`}>
-                  {player.province}
-                </span>
+                onTransfer ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTransfer(player);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium border hover:ring-1 hover:ring-slate-400 dark:hover:ring-slate-500 transition cursor-pointer ${provincePill}`}
+                    title="Click to transfer squad or change province"
+                  >
+                    <span>{player.province}</span>
+                    <ArrowRightLeft className="w-2.5 h-2.5 opacity-60" />
+                  </button>
+                ) : (
+                  <span className={`px-1.5 py-0.2 rounded text-[10px] font-medium border ${provincePill}`}>
+                    {player.province}
+                  </span>
+                )
               )}
             </div>
 
@@ -212,7 +231,7 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
           </div>
         </div>
 
-        {/* Right: Rating Pill & Propose Button */}
+        {/* Right: Rating Pill & Actions */}
         <div className="flex flex-col items-end gap-1.5 shrink-0">
           <div className="flex items-center gap-1.5">
             <div
@@ -223,19 +242,39 @@ export const PlayerRow: React.FC<PlayerRowProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onChallenge(player);
-            }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onTouchStart={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 transition shadow-xs cursor-pointer"
-            title="Propose a rating change or challenge"
-          >
-            <MessageSquarePlus className="w-3 h-3" />
-            <span>Challenge</span>
-          </button>
+          <div className="flex items-center gap-1">
+            {onTransfer && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTransfer(player);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 transition shadow-xs cursor-pointer"
+                title="Transfer player or reallocate provincial squad"
+              >
+                <ArrowRightLeft className="w-3 h-3 text-slate-500" />
+                <span className="hidden sm:inline">Transfer</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChallenge(player);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 border border-emerald-200 dark:border-emerald-800 transition shadow-xs cursor-pointer"
+              title="Propose a rating change or challenge"
+            >
+              <MessageSquarePlus className="w-3 h-3" />
+              <span>Challenge</span>
+            </button>
+          </div>
         </div>
       </div>
 

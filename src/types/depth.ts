@@ -17,13 +17,16 @@ export interface RatingSpread {
   voteCount: number;
 }
 
+export type Province = 'Leinster' | 'Munster' | 'Ulster' | 'Connacht' | 'Exile' | 'Other';
+export const PROVINCES: Province[] = ['Leinster', 'Munster', 'Ulster', 'Connacht', 'Exile', 'Other'];
+
 export interface PlayerEntry {
   id: string;
   name: string;
   pos: number;
   rating: number;
   secondary: boolean;
-  province?: 'Leinster' | 'Munster' | 'Ulster' | 'Connacht' | 'Exile' | 'Other';
+  province?: Province;
   uncapped?: boolean;
   status: PlayerStatus;
   statusReason?: string;
@@ -35,7 +38,7 @@ export interface PlayerEntry {
   startsAtOtherPos?: number; // Indicates this player is selected as #1 starter in another position
 }
 
-export type ProposalType = 'rerate' | 'reorder' | 'add_player' | 'retire' | 'add_secondary' | 'select_starter';
+export type ProposalType = 'rerate' | 'reorder' | 'add_player' | 'retire' | 'add_secondary' | 'select_starter' | 'transfer';
 
 export type ProposalStatus = 'open' | 'passed' | 'failed' | 'cancelled';
 
@@ -77,6 +80,8 @@ export interface Proposal {
   resolvedAt?: string;
   resolvedValue?: number | string;
   resolutionNote?: string;
+  province?: Province;
+  uncapped?: boolean;
 }
 
 export interface Member {
@@ -156,7 +161,7 @@ export interface ProposalResolution {
   status: 'open' | 'passed' | 'failed';
   proposalType: ProposalType;
   resolvedRating?: number;
-  resolvedAction?: 'rerate' | 'retire' | 'add_player' | 'reorder' | 'add_secondary' | 'select_starter';
+  resolvedAction?: 'rerate' | 'retire' | 'add_player' | 'reorder' | 'add_secondary' | 'select_starter' | 'transfer';
   spread?: RatingSpread;
   summary: string;
 }

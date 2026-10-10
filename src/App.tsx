@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDepthStore } from './lib/store';
 import { POSITIONS } from './data/baseline2025';
 import { Header } from './components/layout/Header';
@@ -17,8 +17,10 @@ import { RebaseWizard } from './components/rebase/RebaseWizard';
 import { RulesModal } from './components/views/RulesModal';
 import { RugbyPitchView } from './components/analytics/RugbyPitchView';
 import { AnalystChartsView } from './components/analytics/AnalystChartsView';
-import { PlayerEntry, Position, Proposal } from './types/depth';
-import { Search, RotateCcw } from 'lucide-react';
+import { TransferPlayerModal } from './components/modals/TransferPlayerModal';
+import { AddBreakthroughPlayerModal } from './components/modals/AddBreakthroughPlayerModal';
+import { PlayerEntry, Position, Proposal, Province, PROVINCES } from './types/depth';
+import { Search, RotateCcw, ArrowRightLeft, UserPlus } from 'lucide-react';
 
 export const App: React.FC = () => {
   const store = useDepthStore();
@@ -27,6 +29,7 @@ export const App: React.FC = () => {
   const [selectedPosId, setSelectedPosId] = useState<number>(10); // Default to Fly-Half (10) for pub debate
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [positionFilter, setPositionFilter] = useState<'all' | 'Forwards' | 'Backs'>('all');
+  const [provinceFilter, setProvinceFilter] = useState<'all' | Province>('all');
 
   // Modals state
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
@@ -34,6 +37,12 @@ export const App: React.FC = () => {
   const [proposalTargetPosition, setProposalTargetPosition] = useState<Position | undefined>();
   const [proposalRationale, setProposalRationale] = useState<string>('');
   const [isRulesModalOpen, setIsRulesModalOpen] = useState(false);
+
+  // Transfer & Breakthrough Modals state
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [transferTargetPlayer, setTransferTargetPlayer] = useState<PlayerEntry | undefined>();
+  const [isBreakthroughModalOpen, setIsBreakthroughModalOpen] = useState(false);
+  const [breakthroughDefaultPosId, setBreakthroughDefaultPosId] = useState<number>(10);
 
   // Use the resolved ladders where every position has a distinct #1 starter
   const playersByPos = store.resolvedSelection.adjustedLadders;
@@ -46,10 +55,17 @@ export const App: React.FC = () => {
   };
 
   const handleAddPlayer = (pos: Position) => {
-    setProposalTargetPlayer(undefined);
-    setProposalTargetPosition(pos);
-    setProposalRationale('');
-    setIsProposalModalOpen(true);
+    handleOpenBreakthrough(pos.id);
+  };
+
+  const handleOpenTransfer = (player?: PlayerEntry) => {
+    setTransferTargetPlayer(player);
+    setIsTransferModalOpen(true);
+  };
+
+  const handleOpenBreakthrough = (posId?: number) => {
+    setBreakthroughDefaultPosId(posId ?? selectedPosId ?? 10);
+    setIsBreakthroughModalOpen(true);
   };
 
   const handleOpenPubView = (posId: number) => {
@@ -73,13 +89,42 @@ export const App: React.FC = () => {
   const openProposals = store.proposals.filter((p) => p.status === 'open');
   const contestedPlayers = store.players.filter((p) => p.isContested);
 
+  // Unique active players for province counts
+  const uniquePlayers = useMemo(() => {
+    const map = new Map<string, PlayerEntry>();
+    store.players.forEach((p) => {
+      const key = p.name.toLowerCase().trim();
+      if (!map.has(key)) map.set(key, p);
+    });
+    return Array.from(map.values());
+  }, [store.players]);
+
+  const provinceCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: uniquePlayers.length };
+    PROVINCES.forEach((prov) => {
+      counts[prov] = uniquePlayers.filter((p) => (p.province ?? 'Other') === prov).length;
+    });
+    return counts;
+  }, [uniquePlayers]);
+
+  // Filtered ladder per position if province filter is active
+  const displayedPlayersByPos = useMemo(() => {
+    if (provinceFilter === 'all') return playersByPos;
+    const filtered: Record<number, PlayerEntry[]> = {};
+    Object.entries(playersByPos).forEach(([posId, list]) => {
+      filtered[Number(posId)] = (list ?? []).filter((p) => (p.province ?? 'Other') === provinceFilter);
+    });
+    return filtered;
+  }, [playersByPos, provinceFilter]);
+
   // Filter positions for main chart
   const displayedPositions = POSITIONS.filter((pos) => {
     if (positionFilter !== 'all' && pos.group !== positionFilter) return false;
+    const candidateList = displayedPlayersByPos[pos.id] ?? [];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const posMatches = pos.name.toLowerCase().includes(q) || pos.abbr.toLowerCase().includes(q);
-      const playerMatches = (playersByPos[pos.id] ?? []).some((pl) =>
+      const playerMatches = candidateList.some((pl) =>
         pl.name.toLowerCase().includes(q)
       );
       return posMatches || playerMatches;
@@ -133,50 +178,123 @@ export const App: React.FC = () => {
               onSelectPosition={handleOpenPubView}
             />
 
-            {/* Filter and Search Bar */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setPositionFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    positionFilter === 'all'
-                      ? 'bg-[#0D6938] text-white shadow-xs'
-                      : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  All 15 Positions
-                </button>
-                <button
-                  onClick={() => setPositionFilter('Forwards')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    positionFilter === 'Forwards'
-                      ? 'bg-[#0D6938] text-white shadow-xs'
-                      : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  Forwards (1–8)
-                </button>
-                <button
-                  onClick={() => setPositionFilter('Backs')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    positionFilter === 'Backs'
-                      ? 'bg-[#0D6938] text-white shadow-xs'
-                      : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
-                  }`}
-                >
-                  Backs (9–15)
-                </button>
+            {/* Filter and Action Bar */}
+            <div className="space-y-2.5 pt-2">
+              {/* Row 1: Position filters + Action buttons + Search */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => setPositionFilter('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      positionFilter === 'all'
+                        ? 'bg-[#0D6938] text-white shadow-xs'
+                        : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    All 15 Positions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPositionFilter('Forwards')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      positionFilter === 'Forwards'
+                        ? 'bg-[#0D6938] text-white shadow-xs'
+                        : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    Forwards (1–8)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPositionFilter('Backs')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      positionFilter === 'Backs'
+                        ? 'bg-[#0D6938] text-white shadow-xs'
+                        : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800'
+                    }`}
+                  >
+                    Backs (9–15)
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenTransfer()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-850 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-750 transition shadow-xs cursor-pointer"
+                    title="Transfer player or change provincial squad allocation"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Transfer Player</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenBreakthrough()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-[#0D6938] hover:bg-[#0a522c] transition shadow-xs cursor-pointer"
+                    title="Add new 2026 breakthrough talent"
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ Add 2026 Breakthrough</span>
+                  </button>
+
+                  <div className="relative w-full sm:w-56">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Filter player or position..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#0D6938]"
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div className="relative w-full sm:w-64">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Filter player or position..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs rounded-xl bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-[#0D6938]"
-                />
+              {/* Row 2: Province Filter Chips with live player counts */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mr-1 shrink-0">
+                  Province:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setProvinceFilter('all')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition shrink-0 cursor-pointer ${
+                    provinceFilter === 'all'
+                      ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-xs'
+                      : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                  }`}
+                >
+                  All Squads <span className="text-[10px] opacity-75 font-mono">({provinceCounts.all ?? 0})</span>
+                </button>
+
+                {PROVINCES.map((prov) => {
+                  const count = provinceCounts[prov] ?? 0;
+                  const isSelected = provinceFilter === prov;
+                  return (
+                    <button
+                      key={prov}
+                      type="button"
+                      onClick={() => setProvinceFilter(isSelected ? 'all' : prov)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition shrink-0 cursor-pointer border ${
+                        isSelected
+                          ? prov === 'Leinster'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : prov === 'Munster'
+                            ? 'bg-red-600 text-white border-red-600 shadow-xs'
+                            : prov === 'Ulster'
+                            ? 'bg-slate-700 text-white border-slate-700 shadow-xs'
+                            : prov === 'Connacht'
+                            ? 'bg-[#0D6938] text-white border-[#0D6938] shadow-xs'
+                            : 'bg-purple-600 text-white border-purple-600 shadow-xs'
+                          : 'bg-white dark:bg-slate-850 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-800 hover:border-slate-300'
+                      }`}
+                    >
+                      {prov} <span className="text-[10px] opacity-75 font-mono">({count})</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -186,9 +304,10 @@ export const App: React.FC = () => {
                 <PositionCard
                   key={pos.id}
                   position={pos}
-                  players={playersByPos[pos.id] ?? []}
+                  players={displayedPlayersByPos[pos.id] ?? []}
                   onChallengePlayer={handleChallengePlayer}
-                  onAddPlayer={handleAddPlayer}
+                  onTransferPlayer={handleOpenTransfer}
+                  onAddPlayer={(posObj) => handleOpenBreakthrough(posObj.id)}
                   onOpenPubView={handleOpenPubView}
                   onReorderLadder={store.reorderPositionLadder}
                   isVacant={store.resolvedSelection.unresolvedPositions.includes(pos.id)}
@@ -241,7 +360,8 @@ export const App: React.FC = () => {
               selectedPosId={selectedPosId}
               onSelectPosId={setSelectedPosId}
               onChallengePlayer={handleChallengePlayer}
-              onAddPlayer={handleAddPlayer}
+              onTransferPlayer={handleOpenTransfer}
+              onAddPlayer={(posObj) => handleOpenBreakthrough(posObj.id)}
               openProposals={openProposals}
               onViewProposal={handleViewProposal}
               onReorderLadder={store.reorderPositionLadder}
@@ -318,6 +438,7 @@ export const App: React.FC = () => {
               onSetGate={store.setGate}
               onRecordGate1={store.recordGate1}
               onRecordGate1Batch={store.recordGate1Batch}
+              onTransferPlayer={handleOpenTransfer}
               onAddGate2Entrant={store.addGate2Entrant}
               onRemoveGate2Entrant={store.removeGate2Entrant}
               onMarkGate3Position={store.markGate3Position}
@@ -369,6 +490,34 @@ export const App: React.FC = () => {
         positions={POSITIONS}
         initialRationale={proposalRationale}
         onSubmit={store.createProposal}
+      />
+
+      <TransferPlayerModal
+        isOpen={isTransferModalOpen}
+        onClose={() => setIsTransferModalOpen(false)}
+        player={transferTargetPlayer}
+        allPlayers={store.players}
+        onTransferDirect={store.transferPlayer}
+        onProposeTransfer={(data) => {
+          store.createProposal({
+            type: 'transfer',
+            targetPlayerName: data.targetPlayerName,
+            pos: data.pos,
+            currentValue: data.currentProvince,
+            proposedValue: data.newProvince,
+            rationale: data.rationale,
+            province: data.newProvince,
+          });
+        }}
+      />
+
+      <AddBreakthroughPlayerModal
+        isOpen={isBreakthroughModalOpen}
+        onClose={() => setIsBreakthroughModalOpen(false)}
+        positions={POSITIONS}
+        defaultPositionId={breakthroughDefaultPosId}
+        onAddPlayerDirect={store.addPlayer}
+        onProposePlayer={store.createProposal}
       />
 
       <RulesModal

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution } from '../types/depth';
+import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution, Province } from '../types/depth';
 import { BASELINE_PLAYERS, IMMUTABLE_2025_SNAPSHOT, POSITIONS } from '../data/baseline2025';
 import { DEFAULT_MEMBERS, DEFAULT_GROUP_CODE } from '../data/defaultMembers';
 import { evaluateProposal } from './consensusEngine';
@@ -360,6 +360,8 @@ export function useDepthStore() {
     currentValue: number | string;
     proposedValue: number | string;
     rationale: string;
+    province?: Province;
+    uncapped?: boolean;
   }) => {
     const newProposal: Proposal = {
       id: `prop-${Date.now()}`,
@@ -415,6 +417,18 @@ export function useDepthStore() {
         });
         return next;
       });
+    } else if (prop.type === 'transfer') {
+      const targetProv = (prop.province || (typeof prop.proposedValue === 'string' ? prop.proposedValue : 'Other')) as Province;
+      setPlayers(curr => curr.map(pl => {
+        if (pl.name.toLowerCase().trim() === cleanName) {
+          return {
+            ...pl,
+            province: targetProv,
+            lastReviewed: `Transferred to ${targetProv}`,
+          };
+        }
+        return pl;
+      }));
     } else if (prop.type === 'add_player') {
       const rating = typeof resolution.resolvedRating === 'number' && !isNaN(resolution.resolvedRating)
         ? resolution.resolvedRating
@@ -426,6 +440,8 @@ export function useDepthStore() {
         pos: prop.pos,
         rating,
         secondary: false,
+        province: prop.province ?? 'Leinster',
+        uncapped: prop.uncapped ?? true,
         status: 'active',
         lastReviewed: 'Consensus Add',
         spread: resolution.spread ?? {
@@ -755,6 +771,54 @@ export function useDepthStore() {
     });
   }, [players, rebaseSession, activeMember]);
 
+  const transferPlayer = useCallback((playerName: string, newProvince: Province, notes?: string) => {
+    const cleanName = playerName.toLowerCase().trim();
+    setPlayers(curr => curr.map(pl => {
+      if (pl.name.toLowerCase().trim() === cleanName) {
+        return {
+          ...pl,
+          province: newProvince,
+          lastReviewed: notes?.trim() ? `Transfer: ${notes.trim()}` : `Transferred to ${newProvince}`,
+        };
+      }
+      return pl;
+    }));
+  }, []);
+
+  const addPlayer = useCallback((data: {
+    name: string;
+    pos: number;
+    rating: number;
+    province: Province;
+    uncapped?: boolean;
+    secondary?: boolean;
+    notes?: string;
+  }) => {
+    const cleanName = data.name.trim();
+    const newPlayer: PlayerEntry = {
+      id: `p-${data.pos}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: cleanName,
+      pos: data.pos,
+      rating: data.rating,
+      secondary: data.secondary ?? false,
+      province: data.province,
+      uncapped: data.uncapped ?? true,
+      status: 'active',
+      lastReviewed: data.notes?.trim() || '2026 Breakthrough Entrant',
+      spread: {
+        min: Math.max(45, data.rating - 2),
+        max: Math.min(99, data.rating + 2),
+        stdDev: 1.2,
+        voteCount: 1,
+      },
+      isContested: false,
+      disputeCount: 0,
+    };
+
+    setPlayers(curr => [...curr, newPlayer]);
+    return newPlayer;
+  }, []);
+
   const resetAllToBaseline = useCallback(() => {
     // Scoped storage removal (LAZY 3) — never nuke unrelated keys on shared origin
     Object.values(STORAGE_KEYS).forEach(key => {
@@ -801,6 +865,8 @@ export function useDepthStore() {
     castVote,
     addComment,
     manuallyResolveProposal,
+    transferPlayer,
+    addPlayer,
     openRebase,
     setGate,
     recordGate1,

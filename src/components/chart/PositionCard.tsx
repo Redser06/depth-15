@@ -26,6 +26,7 @@ interface PositionCardProps {
   position: Position;
   players: PlayerEntry[];
   onChallengePlayer: (player: PlayerEntry) => void;
+  onTransferPlayer?: (player: PlayerEntry) => void;
   onAddPlayer: (pos: Position) => void;
   onOpenPubView?: (posId: number) => void;
   onReorderLadder?: (posId: number, orderedPlayerIds: string[]) => void;
@@ -36,6 +37,7 @@ interface SortablePlayerRowProps {
   player: PlayerEntry;
   rank: number;
   onChallenge: (player: PlayerEntry) => void;
+  onTransfer?: (player: PlayerEntry) => void;
   isDraggable: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
@@ -81,6 +83,7 @@ export const PositionCard: React.FC<PositionCardProps> = ({
   position,
   players,
   onChallengePlayer,
+  onTransferPlayer,
   onAddPlayer,
   onOpenPubView,
   onReorderLadder,
@@ -188,6 +191,7 @@ export const PositionCard: React.FC<PositionCardProps> = ({
                   player={player}
                   rank={idx + 1}
                   onChallenge={onChallengePlayer}
+                  onTransfer={onTransferPlayer}
                   isDraggable={Boolean(onReorderLadder)}
                   canMoveUp={idx > 0}
                   canMoveDown={idx < players.length - 1}

@@ -13,7 +13,8 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Shield
+  Shield,
+  ArrowRightLeft,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -26,6 +27,7 @@ interface RebaseWizardProps {
   onSetGate: (gate: 1 | 2 | 3 | 4) => void;
   onRecordGate1: (playerName: string, action: 'keep' | 'retire' | 'ineligible', reason?: string) => void;
   onRecordGate1Batch?: (playerNames: string[], action: 'keep' | 'retire' | 'ineligible', reason?: string) => void;
+  onTransferPlayer?: (player: PlayerEntry) => void;
   onAddGate2Entrant: (entrant: Omit<Gate2Entrant, 'id'>) => void;
   onRemoveGate2Entrant?: (entrantId: string) => void;
   onMarkGate3Position: (posId: number) => void;
@@ -41,6 +43,7 @@ export const RebaseWizard: React.FC<RebaseWizardProps> = ({
   onSetGate,
   onRecordGate1,
   onRecordGate1Batch,
+  onTransferPlayer,
   onAddGate2Entrant,
   onRemoveGate2Entrant,
   onMarkGate3Position,
@@ -429,9 +432,21 @@ export const RebaseWizard: React.FC<RebaseWizardProps> = ({
                               {player.rating}
                             </span>
                             {player.province && (
-                              <span className="px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                {player.province}
-                              </span>
+                              onTransferPlayer ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onTransferPlayer(player)}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+                                  title="Click to transfer player or change provincial squad allocation"
+                                >
+                                  <span>{player.province}</span>
+                                  <ArrowRightLeft className="w-2.5 h-2.5 opacity-60" />
+                                </button>
+                              ) : (
+                                <span className="px-1.5 py-0.2 rounded text-[9.5px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                                  {player.province}
+                                </span>
+                              )
                             )}
                             {decision !== 'keep' && (
                               <span
