@@ -12,6 +12,7 @@ import {
 import { calculateDepthScore, getDepthBand, getRatingTier } from '../../lib/depthCalc';
 import { filterBlogPosts } from '../../lib/blogGenerator';
 import { CreateBlogPostModal } from './CreateBlogPostModal';
+import { VoiceNotePlayer, VoiceNoteRecorder } from './VoiceNoteWidget';
 import {
   BookOpen,
   Sparkles,
@@ -29,6 +30,8 @@ import {
   MessageSquarePlus,
   Send,
   Layers,
+  Mic,
+  Volume2,
 } from 'lucide-react';
 
 interface BlogViewProps {
@@ -51,10 +54,19 @@ interface BlogViewProps {
     hotTake?: BlogHotTake;
     sections: BlogSection[];
     featured?: boolean;
+    voiceNote?: { durationSeconds: number; audioUrl?: string; transcript: string };
   }) => BlogPost;
   onGenerateDigest: () => BlogPost;
   onToggleLike: (postId: string) => void;
-  onAddComment: (postId: string, text: string) => void;
+  onAddVoiceNoteToPost?: (
+    postId: string,
+    note: { durationSeconds: number; audioUrl?: string; transcript: string }
+  ) => void;
+  onAddComment: (
+    postId: string,
+    text: string,
+    voiceNote?: { durationSeconds: number; audioUrl?: string; transcript: string }
+  ) => void;
   onSubscribeNewsletter: (email: string) => boolean;
 }
 
@@ -82,6 +94,7 @@ export const BlogView: React.FC<BlogViewProps> = ({
   onCreatePost,
   onGenerateDigest,
   onToggleLike,
+  onAddVoiceNoteToPost,
   onAddComment,
   onSubscribeNewsletter,
 }) => {
@@ -91,8 +104,17 @@ export const BlogView: React.FC<BlogViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  // Comment input for open article
+  // Article audio dispatch recording state
+  const [isRecordingArticleDispatch, setIsRecordingArticleDispatch] = useState(false);
+
+  // Comment input and attached voice note for open article
   const [commentDraft, setCommentDraft] = useState('');
+  const [isRecordingCommentVoice, setIsRecordingCommentVoice] = useState(false);
+  const [stagedCommentVoiceNote, setStagedCommentVoiceNote] = useState<{
+    durationSeconds: number;
+    audioUrl?: string;
+    transcript: string;
+  } | null>(null);
 
   // Newsletter state
   const [emailInput, setEmailInput] = useState('');
@@ -145,9 +167,11 @@ export const BlogView: React.FC<BlogViewProps> = ({
 
   const handleCommentSubmit = (e: React.FormEvent, postId: string) => {
     e.preventDefault();
-    if (!commentDraft.trim()) return;
-    onAddComment(postId, commentDraft);
+    if (!commentDraft.trim() && !stagedCommentVoiceNote) return;
+    onAddComment(postId, commentDraft, stagedCommentVoiceNote ?? undefined);
     setCommentDraft('');
+    setStagedCommentVoiceNote(null);
+    setIsRecordingCommentVoice(false);
   };
 
   const renderEmbeddedLadder = (posId: number) => {
@@ -371,6 +395,74 @@ export const BlogView: React.FC<BlogViewProps> = ({
             </div>
           </div>
 
+          {/* Tactical Audio Briefings & Voice Notes */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/50 dark:from-emerald-950/20 dark:via-slate-850 dark:to-emerald-950/10 border border-emerald-200/80 dark:border-emerald-800/60 space-y-3.5 shadow-2xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 rounded-lg bg-[#0D6938] text-white">
+                  <Volume2 className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-emerald-900 dark:text-emerald-300">
+                    Tactical Audio Briefings &amp; Voice Notes
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Press box dispatches, player insights, and spoken editorial commentary
+                  </p>
+                </div>
+              </div>
+
+              {!isRecordingArticleDispatch && (
+                <button
+                  type="button"
+                  onClick={() => setIsRecordingArticleDispatch(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#0D6938] hover:bg-[#0a522c] text-white transition cursor-pointer shadow-2xs"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>+ Record Voice Dispatch</span>
+                </button>
+              )}
+            </div>
+
+            {isRecordingArticleDispatch && (
+              <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                  <span>Record Tactical Voice Dispatch as {activeMember.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsRecordingArticleDispatch(false)}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs cursor-pointer font-normal"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <VoiceNoteRecorder
+                  authorName={activeMember.name}
+                  onSaveVoiceNote={(note) => {
+                    onAddVoiceNoteToPost?.(selectedPost.id, note);
+                    setIsRecordingArticleDispatch(false);
+                  }}
+                  placeholder="Record an audio dispatch or dictate spoken tactical analysis for this article..."
+                  compact
+                />
+              </div>
+            )}
+
+            {selectedPost.voiceNotes && selectedPost.voiceNotes.length > 0 ? (
+              <div className="space-y-2.5 pt-1">
+                {selectedPost.voiceNotes.map((vn) => (
+                  <VoiceNotePlayer key={vn.id} voiceNote={vn} />
+                ))}
+              </div>
+            ) : (
+              !isRecordingArticleDispatch && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 italic">
+                  No audio notes recorded for this column yet. Hit &ldquo;Record Voice Dispatch&rdquo; to attach a spoken brief.
+                </p>
+              )
+            )}
+          </div>
+
           {/* Article Sections + Embedded Position Ladders */}
           <div className="space-y-6">
             {selectedPost.sections.map((sec, idx) => (
@@ -457,12 +549,20 @@ export const BlogView: React.FC<BlogViewProps> = ({
                 {selectedPost.comments.map((c) => (
                   <div
                     key={c.id}
-                    className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/70 space-y-1"
+                    className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/70 border border-slate-200/80 dark:border-slate-700/70 space-y-2"
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {c.memberName}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {c.memberName}
+                        </span>
+                        {c.voiceNote && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300">
+                            <Mic className="w-2.5 h-2.5" />
+                            <span>Voice Note</span>
+                          </span>
+                        )}
+                      </div>
                       <span className="text-slate-400">
                         {new Date(c.timestamp).toLocaleDateString('en-IE', {
                           day: 'numeric',
@@ -470,31 +570,112 @@ export const BlogView: React.FC<BlogViewProps> = ({
                         })}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-700 dark:text-slate-300">{c.text}</p>
+
+                    {c.voiceNote && (
+                      <VoiceNotePlayer voiceNote={c.voiceNote} compact />
+                    )}
+
+                    {c.text && (
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                        {c.text}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             )}
 
-            <form
-              onSubmit={(e) => handleCommentSubmit(e, selectedPost.id)}
-              className="flex items-center gap-2 pt-1"
-            >
-              <input
-                type="text"
-                value={commentDraft}
-                onChange={(e) => setCommentDraft(e.target.value)}
-                placeholder={`Add your take as ${activeMember.name}...`}
-                className="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0D6938]"
-              />
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0D6938] hover:bg-[#0a522c] text-white transition cursor-pointer"
+            <div className="space-y-2.5 pt-1">
+              {stagedCommentVoiceNote && (
+                <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-emerald-900 dark:text-emerald-300">
+                    <span className="flex items-center gap-1">
+                      <Mic className="w-3 h-3" />
+                      <span>Attached Reader Voice Note</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setStagedCommentVoiceNote(null)}
+                      className="text-red-600 hover:text-red-700 dark:text-red-400 hover:underline cursor-pointer text-xs"
+                    >
+                      Remove voice note
+                    </button>
+                  </div>
+                  <VoiceNotePlayer
+                    voiceNote={{
+                      id: 'staged-comment-vn',
+                      authorId: activeMember.id,
+                      authorName: activeMember.name,
+                      durationSeconds: stagedCommentVoiceNote.durationSeconds,
+                      audioUrl: stagedCommentVoiceNote.audioUrl,
+                      transcript: stagedCommentVoiceNote.transcript,
+                      createdAt: new Date().toISOString(),
+                    }}
+                    compact
+                  />
+                </div>
+              )}
+
+              {isRecordingCommentVoice && !stagedCommentVoiceNote && (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <span>Record Reader Voice Note as {activeMember.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsRecordingCommentVoice(false)}
+                      className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs cursor-pointer font-normal"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <VoiceNoteRecorder
+                    authorName={activeMember.name}
+                    onSaveVoiceNote={(note) => {
+                      setStagedCommentVoiceNote(note);
+                      setIsRecordingCommentVoice(false);
+                    }}
+                    onDictateToText={(text) => {
+                      setCommentDraft((prev) => (prev ? `${prev} ${text}` : text));
+                    }}
+                    placeholder="Speak your clubhouse debate take or dictate comment..."
+                    compact
+                  />
+                </div>
+              )}
+
+              <form
+                onSubmit={(e) => handleCommentSubmit(e, selectedPost.id)}
+                className="flex items-center gap-2"
               >
-                <Send className="w-3.5 h-3.5" />
-                <span>Post</span>
-              </button>
-            </form>
+                <input
+                  type="text"
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  placeholder={`Add your take as ${activeMember.name}...`}
+                  className="flex-1 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-[#0D6938]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setIsRecordingCommentVoice((prev) => !prev)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                    isRecordingCommentVoice || stagedCommentVoiceNote
+                      ? 'bg-emerald-50 dark:bg-emerald-950/60 border-[#0D6938] text-[#0D6938] dark:text-emerald-400'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100'
+                  }`}
+                  title="Record or dictate voice note comment"
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Voice Note</span>
+                </button>
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0D6938] hover:bg-[#0a522c] text-white transition cursor-pointer"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Post</span>
+                </button>
+              </form>
+            </div>
           </div>
         </article>
       </div>
@@ -626,6 +807,12 @@ export const BlogView: React.FC<BlogViewProps> = ({
                   <Clock className="w-3 h-3" />
                   {leadStory.readTimeMinutes} min read
                 </span>
+                {leadStory.voiceNotes && leadStory.voiceNotes.length > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/20 text-white border border-white/25">
+                    <Mic className="w-3 h-3 text-emerald-300" />
+                    <span>Audio Dispatch Included</span>
+                  </span>
+                )}
               </div>
 
               <h2 className="text-xl sm:text-2xl font-black leading-snug group-hover:underline">
@@ -711,6 +898,12 @@ export const BlogView: React.FC<BlogViewProps> = ({
                       {post.category}
                     </span>
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                      {post.voiceNotes && post.voiceNotes.length > 0 && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <Mic className="w-2.5 h-2.5 text-[#0D6938] dark:text-emerald-400" />
+                          <span>Audio Note</span>
+                        </span>
+                      )}
                       <Clock className="w-3 h-3" />
                       <span>{post.readTimeMinutes}m read</span>
                       <span>·</span>

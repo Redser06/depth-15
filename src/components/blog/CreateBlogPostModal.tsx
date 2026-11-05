@@ -7,6 +7,7 @@ import {
   PlayerEntry,
   Position,
 } from '../../types/depth';
+import { VoiceNotePlayer, VoiceNoteRecorder } from './VoiceNoteWidget';
 import { X, PenTool, Sparkles, AlertCircle, Check } from 'lucide-react';
 
 interface CreateBlogPostModalProps {
@@ -24,6 +25,7 @@ interface CreateBlogPostModalProps {
     hotTake?: BlogHotTake;
     sections: BlogSection[];
     featured?: boolean;
+    voiceNote?: { durationSeconds: number; audioUrl?: string; transcript: string };
   }) => void;
 }
 
@@ -48,6 +50,11 @@ export const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
   const [hotTakeRating, setHotTakeRating] = useState(86);
   const [hotTakeRationale, setHotTakeRationale] = useState('');
   const [featured, setFeatured] = useState(false);
+  const [stagedVoiceNote, setStagedVoiceNote] = useState<{
+    durationSeconds: number;
+    audioUrl?: string;
+    transcript: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
@@ -132,6 +139,7 @@ export const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
       hotTake,
       sections,
       featured,
+      voiceNote: stagedVoiceNote ?? undefined,
     });
 
     setTitle('');
@@ -139,6 +147,7 @@ export const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
     setSection1Body('');
     setSection1Callout('');
     setSection2Body('');
+    setStagedVoiceNote(null);
     setError(null);
     onClose();
   };
@@ -275,6 +284,46 @@ export const CreateBlogPostModal: React.FC<CreateBlogPostModalProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Author Voice Note & Voice-to-Text Dictation */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+              Author Voice Note &amp; Dictation (Record an audio briefing or dictate into Section 1)
+            </label>
+            {stagedVoiceNote ? (
+              <div className="space-y-1.5">
+                <VoiceNotePlayer
+                  voiceNote={{
+                    id: 'staged-vn',
+                    authorId: 'author',
+                    authorName: 'Attached Author Voice Note',
+                    durationSeconds: stagedVoiceNote.durationSeconds,
+                    audioUrl: stagedVoiceNote.audioUrl,
+                    transcript: stagedVoiceNote.transcript,
+                    createdAt: new Date().toISOString(),
+                  }}
+                  compact
+                />
+                <button
+                  type="button"
+                  onClick={() => setStagedVoiceNote(null)}
+                  className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                >
+                  Remove attached voice note
+                </button>
+              </div>
+            ) : (
+              <VoiceNoteRecorder
+                authorName="Columnist"
+                onSaveVoiceNote={(note) => setStagedVoiceNote(note)}
+                onDictateToText={(text) =>
+                  setSection1Body((prev) => (prev ? `${prev}\n\n${text}` : text))
+                }
+                placeholder="Record a voice note to embed at the top of your post, or click 'Insert into Article'..."
+                compact
+              />
+            )}
           </div>
 
           {/* Section 1 */}

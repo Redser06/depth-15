@@ -416,6 +416,7 @@ export const App: React.FC = () => {
               onCreatePost={store.createBlogPost}
               onGenerateDigest={store.generateWeeklyDigest}
               onToggleLike={store.toggleBlogLike}
+              onAddVoiceNoteToPost={store.addBlogVoiceNote}
               onAddComment={store.addBlogComment}
               onSubscribeNewsletter={store.subscribeNewsletter}
             />

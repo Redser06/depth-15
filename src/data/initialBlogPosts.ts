@@ -42,6 +42,18 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
         body: 'For Prendergast to overtake Crowley on the Depth 15 consensus board during the Autumn Nations Series, the metric to watch is not highlight-reel distribution—it is defensive frontline completion against ball-carrying centres running down the 10 channel. Until then, Crowley holds the #1 shirt by virtue of his test-match floor, while Prendergast remains the highest-upside challenger in Irish rugby.',
       },
     ],
+    voiceNotes: [
+      {
+        id: 'vn-seed-fh-1',
+        authorId: 'm-conor',
+        authorName: 'Conor Redmond',
+        authorRole: 'Lead Tactical Analyst',
+        durationSeconds: 18,
+        transcript:
+          'Quick voice note from the Aviva press box: watch Sam Prendergast’s alignment on third-phase strike plays. He stands a full metre flatter than last season, forcing the opposition 12 to hold his feet and opening the outside channel for Ringrose.',
+        createdAt: '2026-11-04T09:40:00Z',
+      },
+    ],
     likes: ['m-conor', 'm-declan', 'm-fiona'],
     comments: [
       {
@@ -50,6 +62,15 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
         memberName: 'Ronan O’Shea',
         text: 'Crowley won a Six Nations as the main man and went toe-to-toe with the Springboks in Durban. Moving Prendergast above 83 before he bosses a Champions Cup semi-final is premature.',
         timestamp: '2026-11-04T11:15:00Z',
+        voiceNote: {
+          id: 'vn-seed-comment-1',
+          authorId: 'm-ronan',
+          authorName: 'Ronan O’Shea',
+          durationSeconds: 14,
+          transcript:
+            'Lads, test match knockout rugby is won on goal-kicking under pressure and tackling 115-kilo back-rows in the 10 channel. Crowley has done it in Marseille and Durban—he keeps the 10 shirt.',
+          createdAt: '2026-11-04T11:15:00Z',
+        },
       },
       {
         id: 'bc-2',
@@ -95,6 +116,18 @@ export const INITIAL_BLOG_POSTS: BlogPost[] = [
         heading: 'Clarkson’s Ascent and O’Toole’s Cross-Prop Utility',
         body: 'Tom Clarkson’s rise to 82 on the consensus chart is the biggest forward mover of the 2026 cycle. Paired with Finlay Bealham’s veteran scrummaging craft (78) and Tom O’Toole’s ability to cover both sides of the scrum alongside Andrew Porter (92) and Paddy McCarthy (82) at Loosehead, Ireland finally has the beginnings of a post-Furlong succession blueprint.',
         embeddedPosId: 1,
+      },
+    ],
+    voiceNotes: [
+      {
+        id: 'vn-seed-thp-1',
+        authorId: 'm-declan',
+        authorName: 'Declan Murphy',
+        authorRole: 'Set-Piece & Pack Columnist',
+        durationSeconds: 16,
+        transcript:
+          'Scrum review note: Tom Clarkson’s bind height on the engagement against La Rochelle held firm for 62 minutes. That gives Farrell genuine 50-30 minute split options with Furlong.',
+        createdAt: '2026-11-02T16:10:00Z',
       },
     ],
     likes: ['m-declan', 'm-brian'],

@@ -198,12 +198,24 @@ export interface BlogSection {
   embeddedPosId?: number;
 }
 
+export interface VoiceNote {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorRole?: string;
+  durationSeconds: number;
+  audioUrl?: string; // base64 data URL recorded via MediaRecorder
+  transcript: string;
+  createdAt: string;
+}
+
 export interface BlogComment {
   id: string;
   memberId: string;
   memberName: string;
   text: string;
   timestamp: string;
+  voiceNote?: VoiceNote;
 }
 
 export interface BlogHotTake {
@@ -230,6 +242,7 @@ export interface BlogPost {
   spotlightPlayerNames: string[];
   hotTake?: BlogHotTake;
   sections: BlogSection[];
+  voiceNotes?: VoiceNote[];
   likes: string[];
   comments: BlogComment[];
 }

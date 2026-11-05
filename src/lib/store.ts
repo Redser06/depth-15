@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution, Province, BlogPost, BlogCategory, BlogSection, BlogHotTake } from '../types/depth';
+import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution, Province, BlogPost, BlogCategory, BlogSection, BlogHotTake, VoiceNote } from '../types/depth';
 import { BASELINE_PLAYERS, IMMUTABLE_2025_SNAPSHOT, POSITIONS } from '../data/baseline2025';
 import { DEFAULT_MEMBERS, DEFAULT_GROUP_CODE } from '../data/defaultMembers';
 import { INITIAL_BLOG_POSTS } from '../data/initialBlogPosts';
@@ -871,6 +871,7 @@ export function useDepthStore() {
     hotTake?: BlogHotTake;
     sections: BlogSection[];
     featured?: boolean;
+    voiceNote?: { durationSeconds: number; audioUrl?: string; transcript: string };
   }) => {
     const cleanTitle = data.title.trim();
     const slug = cleanTitle
@@ -882,6 +883,22 @@ export function useDepthStore() {
       0
     );
     const readTimeMinutes = Math.max(2, Math.round(wordCount / 160));
+    const authorRole = activeMember.role === 'owner' ? 'Lead Tactical Analyst' : 'Clubhouse Columnist';
+
+    const initialVoiceNotes: VoiceNote[] = data.voiceNote
+      ? [
+          {
+            id: `vn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            authorId: activeMember.id,
+            authorName: activeMember.name,
+            authorRole,
+            durationSeconds: data.voiceNote.durationSeconds,
+            audioUrl: data.voiceNote.audioUrl,
+            transcript: data.voiceNote.transcript,
+            createdAt: new Date().toISOString(),
+          },
+        ]
+      : [];
 
     const newPost: BlogPost = {
       id: `blog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -891,7 +908,7 @@ export function useDepthStore() {
       category: data.category,
       authorId: activeMember.id,
       authorName: activeMember.name,
-      authorRole: activeMember.role === 'owner' ? 'Lead Tactical Analyst' : 'Clubhouse Columnist',
+      authorRole,
       publishedAt: new Date().toISOString(),
       readTimeMinutes,
       featured: data.featured ?? false,
@@ -900,6 +917,7 @@ export function useDepthStore() {
       spotlightPlayerNames: data.spotlightPlayerNames,
       hotTake: data.hotTake,
       sections: data.sections,
+      voiceNotes: initialVoiceNotes,
       likes: [activeMember.id],
       comments: [],
     };
@@ -941,9 +959,53 @@ export function useDepthStore() {
     );
   }, [activeMember.id]);
 
-  const addBlogComment = useCallback((postId: string, text: string) => {
-    const clean = text.trim();
-    if (!clean) return;
+  const addBlogVoiceNote = useCallback((postId: string, note: {
+    durationSeconds: number;
+    audioUrl?: string;
+    transcript: string;
+  }) => {
+    const newVoiceNote: VoiceNote = {
+      id: `vn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      authorId: activeMember.id,
+      authorName: activeMember.name,
+      authorRole: activeMember.role === 'owner' ? 'Lead Tactical Analyst' : 'Clubhouse Member',
+      durationSeconds: note.durationSeconds,
+      audioUrl: note.audioUrl,
+      transcript: note.transcript.trim(),
+      createdAt: new Date().toISOString(),
+    };
+
+    setBlogPosts(curr =>
+      curr.map(post => {
+        if (post.id !== postId) return post;
+        return {
+          ...post,
+          voiceNotes: [...(post.voiceNotes ?? []), newVoiceNote],
+        };
+      })
+    );
+    return newVoiceNote;
+  }, [activeMember]);
+
+  const addBlogComment = useCallback((
+    postId: string,
+    text: string,
+    voiceNote?: { durationSeconds: number; audioUrl?: string; transcript: string }
+  ) => {
+    const clean = text.trim() || voiceNote?.transcript.trim() || '';
+    if (!clean && !voiceNote) return;
+    const attachedVoiceNote: VoiceNote | undefined = voiceNote
+      ? {
+          id: `vn-c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          authorId: activeMember.id,
+          authorName: activeMember.name,
+          durationSeconds: voiceNote.durationSeconds,
+          audioUrl: voiceNote.audioUrl,
+          transcript: voiceNote.transcript.trim(),
+          createdAt: new Date().toISOString(),
+        }
+      : undefined;
+
     setBlogPosts(curr =>
       curr.map(post => {
         if (post.id !== postId) return post;
@@ -957,6 +1019,7 @@ export function useDepthStore() {
               memberName: activeMember.name,
               text: clean,
               timestamp: new Date().toISOString(),
+              voiceNote: attachedVoiceNote,
             },
           ],
         };
@@ -1028,6 +1091,7 @@ export function useDepthStore() {
     createBlogPost,
     generateWeeklyDigest,
     toggleBlogLike,
+    addBlogVoiceNote,
     addBlogComment,
     subscribeNewsletter,
     openRebase,
