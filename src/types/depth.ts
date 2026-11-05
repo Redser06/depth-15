@@ -177,3 +177,60 @@ export interface ResolvedSquadSelection {
   ignoredAssignments: string[];
   totalPositions: number;
 }
+
+export type BlogCategory =
+  | 'Matchday Analysis'
+  | 'Positional Deep-Dive'
+  | 'U20 & Breakthrough Watch'
+  | 'Consensus Digest';
+
+export const BLOG_CATEGORIES: BlogCategory[] = [
+  'Matchday Analysis',
+  'Positional Deep-Dive',
+  'U20 & Breakthrough Watch',
+  'Consensus Digest',
+];
+
+export interface BlogSection {
+  heading?: string;
+  body: string;
+  callout?: string;
+  embeddedPosId?: number;
+}
+
+export interface BlogComment {
+  id: string;
+  memberId: string;
+  memberName: string;
+  text: string;
+  timestamp: string;
+}
+
+export interface BlogHotTake {
+  targetPlayerName: string;
+  pos: number;
+  proposedRating: number;
+  rationale: string;
+}
+
+export interface BlogPost {
+  id: string;
+  slug: string;
+  title: string;
+  subtitle: string;
+  category: BlogCategory;
+  authorId: string;
+  authorName: string;
+  authorRole: string;
+  publishedAt: string;
+  readTimeMinutes: number;
+  featured?: boolean;
+  tags: string[];
+  linkedPositions: number[];
+  spotlightPlayerNames: string[];
+  hotTake?: BlogHotTake;
+  sections: BlogSection[];
+  likes: string[];
+  comments: BlogComment[];
+}
+

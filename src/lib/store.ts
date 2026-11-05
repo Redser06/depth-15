@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution, Province } from '../types/depth';
+import { PlayerEntry, Proposal, Snapshot, RebaseSession, Gate2Entrant, ProposalResolution, Province, BlogPost, BlogCategory, BlogSection, BlogHotTake } from '../types/depth';
 import { BASELINE_PLAYERS, IMMUTABLE_2025_SNAPSHOT, POSITIONS } from '../data/baseline2025';
 import { DEFAULT_MEMBERS, DEFAULT_GROUP_CODE } from '../data/defaultMembers';
+import { INITIAL_BLOG_POSTS } from '../data/initialBlogPosts';
 import { evaluateProposal } from './consensusEngine';
 import { resolveStartingXV } from './selectionRules';
 import { groupPlayersByPosition } from './depthCalc';
+import { generateConsensusDigestPost } from './blogGenerator';
 
 const STORAGE_KEYS = {
   PLAYERS: 'depth15_players_v1',
@@ -15,6 +17,8 @@ const STORAGE_KEYS = {
   DARK_MODE: 'depth15_dark_mode_v1',
   STARTER_ASSIGNMENTS: 'depth15_starters_v1',
   POSITION_ORDERS: 'depth15_orders_v1',
+  BLOG_POSTS: 'depth15_blog_posts_v1',
+  NEWSLETTER_SUBSCRIBERS: 'depth15_newsletter_v1',
 };
 
 // Seed initial realistic debate proposals so app is immediately rich with live pub discussion
@@ -226,6 +230,28 @@ export function useDepthStore() {
     return {};
   });
 
+  // Blog posts state
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.BLOG_POSTS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return INITIAL_BLOG_POSTS;
+  });
+
+  // Newsletter subscribers state
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.NEWSLETTER_SUBSCRIBERS);
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
   // Sync starter assignments & position orders
   useEffect(() => {
     try {
@@ -242,6 +268,22 @@ export function useDepthStore() {
       console.error(e);
     }
   }, [positionOrders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, JSON.stringify(blogPosts));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [blogPosts]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.NEWSLETTER_SUBSCRIBERS, JSON.stringify(newsletterSubscribers));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [newsletterSubscribers]);
 
   // Sync with localStorage
   useEffect(() => {
@@ -819,6 +861,118 @@ export function useDepthStore() {
     return newPlayer;
   }, []);
 
+  const createBlogPost = useCallback((data: {
+    title: string;
+    subtitle: string;
+    category: BlogCategory;
+    tags: string[];
+    linkedPositions: number[];
+    spotlightPlayerNames: string[];
+    hotTake?: BlogHotTake;
+    sections: BlogSection[];
+    featured?: boolean;
+  }) => {
+    const cleanTitle = data.title.trim();
+    const slug = cleanTitle
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const wordCount = data.sections.reduce(
+      (sum, s) => sum + s.body.split(/\s+/).length,
+      0
+    );
+    const readTimeMinutes = Math.max(2, Math.round(wordCount / 160));
+
+    const newPost: BlogPost = {
+      id: `blog-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      slug: slug || `post-${Date.now()}`,
+      title: cleanTitle,
+      subtitle: data.subtitle.trim(),
+      category: data.category,
+      authorId: activeMember.id,
+      authorName: activeMember.name,
+      authorRole: activeMember.role === 'owner' ? 'Lead Tactical Analyst' : 'Clubhouse Columnist',
+      publishedAt: new Date().toISOString(),
+      readTimeMinutes,
+      featured: data.featured ?? false,
+      tags: data.tags,
+      linkedPositions: data.linkedPositions,
+      spotlightPlayerNames: data.spotlightPlayerNames,
+      hotTake: data.hotTake,
+      sections: data.sections,
+      likes: [activeMember.id],
+      comments: [],
+    };
+
+    setBlogPosts(curr => {
+      if (newPost.featured) {
+        return [newPost, ...curr.map(p => ({ ...p, featured: false }))];
+      }
+      return [newPost, ...curr];
+    });
+    return newPost;
+  }, [activeMember]);
+
+  const generateWeeklyDigest = useCallback(() => {
+    const digest = generateConsensusDigestPost({
+      players,
+      proposals,
+      positions: POSITIONS,
+      authorId: activeMember.id,
+      authorName: activeMember.name,
+      resolvedSelection,
+    });
+    setBlogPosts(curr => [digest, ...curr]);
+    return digest;
+  }, [players, proposals, activeMember, resolvedSelection]);
+
+  const toggleBlogLike = useCallback((postId: string) => {
+    setBlogPosts(curr =>
+      curr.map(post => {
+        if (post.id !== postId) return post;
+        const alreadyLiked = post.likes.includes(activeMember.id);
+        return {
+          ...post,
+          likes: alreadyLiked
+            ? post.likes.filter(id => id !== activeMember.id)
+            : [...post.likes, activeMember.id],
+        };
+      })
+    );
+  }, [activeMember.id]);
+
+  const addBlogComment = useCallback((postId: string, text: string) => {
+    const clean = text.trim();
+    if (!clean) return;
+    setBlogPosts(curr =>
+      curr.map(post => {
+        if (post.id !== postId) return post;
+        return {
+          ...post,
+          comments: [
+            ...post.comments,
+            {
+              id: `bc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              memberId: activeMember.id,
+              memberName: activeMember.name,
+              text: clean,
+              timestamp: new Date().toISOString(),
+            },
+          ],
+        };
+      })
+    );
+  }, [activeMember]);
+
+  const subscribeNewsletter = useCallback((email: string) => {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized || !normalized.includes('@')) return false;
+    setNewsletterSubscribers(curr =>
+      curr.includes(normalized) ? curr : [...curr, normalized]
+    );
+    return true;
+  }, []);
+
   const resetAllToBaseline = useCallback(() => {
     // Scoped storage removal (LAZY 3) — never nuke unrelated keys on shared origin
     Object.values(STORAGE_KEYS).forEach(key => {
@@ -831,6 +985,8 @@ export function useDepthStore() {
     setPlayers(BASELINE_PLAYERS);
     setProposals(INITIAL_PROPOSALS);
     setSnapshots([IMMUTABLE_2025_SNAPSHOT]);
+    setBlogPosts(INITIAL_BLOG_POSTS);
+    setNewsletterSubscribers([]);
     setActiveMemberId('m-conor');
     setRebaseSession({
       isOpen: false,
@@ -849,6 +1005,8 @@ export function useDepthStore() {
     players,
     proposals,
     snapshots,
+    blogPosts,
+    newsletterSubscribers,
     activeMember,
     members: DEFAULT_MEMBERS,
     groupCode: DEFAULT_GROUP_CODE,
@@ -867,6 +1025,11 @@ export function useDepthStore() {
     manuallyResolveProposal,
     transferPlayer,
     addPlayer,
+    createBlogPost,
+    generateWeeklyDigest,
+    toggleBlogLike,
+    addBlogComment,
+    subscribeNewsletter,
     openRebase,
     setGate,
     recordGate1,

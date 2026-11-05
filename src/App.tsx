@@ -17,10 +17,11 @@ import { RebaseWizard } from './components/rebase/RebaseWizard';
 import { RulesModal } from './components/views/RulesModal';
 import { RugbyPitchView } from './components/analytics/RugbyPitchView';
 import { AnalystChartsView } from './components/analytics/AnalystChartsView';
+import { BlogView } from './components/blog/BlogView';
 import { TransferPlayerModal } from './components/modals/TransferPlayerModal';
 import { AddBreakthroughPlayerModal } from './components/modals/AddBreakthroughPlayerModal';
 import { PlayerEntry, Position, Proposal, Province, PROVINCES } from './types/depth';
-import { Search, RotateCcw, ArrowRightLeft, UserPlus } from 'lucide-react';
+import { Search, RotateCcw, ArrowRightLeft, UserPlus, BookOpen, ArrowRight } from 'lucide-react';
 
 export const App: React.FC = () => {
   const store = useDepthStore();
@@ -154,6 +155,7 @@ export const App: React.FC = () => {
         openProposalsCount={openProposals.length}
         contestedCount={contestedPlayers.length}
         isRebaseOpen={store.rebaseSession.isOpen}
+        blogPostsCount={store.blogPosts.length}
       />
 
       {/* Main Content Area */}
@@ -170,6 +172,34 @@ export const App: React.FC = () => {
               onStartDebate={handleStartSelectionDebate}
               unresolvedPositions={store.resolvedSelection.unresolvedPositions}
             />
+
+            {/* Clubhouse Blog Featured Teaser Strip */}
+            {store.blogPosts[0] && (
+              <div className="rounded-2xl bg-gradient-to-r from-[#073A1E] via-[#0D6938] to-emerald-800 text-white px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shrink-0">
+                    Clubhouse Blog
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-xs sm:text-sm font-black truncate block">
+                      {store.blogPosts[0].title}
+                    </span>
+                    <span className="text-[11px] text-emerald-100/90 truncate block">
+                      By {store.blogPosts[0].authorName} · {store.blogPosts[0].category} · Embeds live #{store.blogPosts[0].linkedPositions.join(', #')} ladders
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCurrentTab('blog')}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-extrabold bg-white text-[#0D6938] hover:bg-emerald-50 transition shrink-0 cursor-pointer"
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  <span>Read & Debate</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Overview Grid */}
             <OverviewGrid
@@ -366,6 +396,28 @@ export const App: React.FC = () => {
               onViewProposal={handleViewProposal}
               onReorderLadder={store.reorderPositionLadder}
               unresolvedPositions={store.resolvedSelection.unresolvedPositions}
+            />
+          </div>
+        )}
+
+        {/* CLUBHOUSE BLOG & EDITORIAL HUB */}
+        {currentTab === 'blog' && (
+          <div className="animate-in fade-in duration-200">
+            <BlogView
+              posts={store.blogPosts}
+              positions={POSITIONS}
+              players={store.players}
+              playersByPos={playersByPos}
+              activeMember={store.activeMember}
+              newsletterSubscribers={store.newsletterSubscribers}
+              onChallengePlayer={handleChallengePlayer}
+              onStartHotTakeDebate={handleStartSelectionDebate}
+              onOpenPubView={handleOpenPubView}
+              onCreatePost={store.createBlogPost}
+              onGenerateDigest={store.generateWeeklyDigest}
+              onToggleLike={store.toggleBlogLike}
+              onAddComment={store.addBlogComment}
+              onSubscribeNewsletter={store.subscribeNewsletter}
             />
           </div>
         )}

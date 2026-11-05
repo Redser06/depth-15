@@ -10,9 +10,10 @@ import {
   GitCompare,
   Compass,
   LineChart,
+  BookOpen,
 } from 'lucide-react';
 
-export type TabType = 'chart' | 'pitch' | 'analytics' | 'pub' | 'proposals' | 'contested' | 'movers' | 'vulnerability' | 'rebase' | 'diff';
+export type TabType = 'chart' | 'pitch' | 'analytics' | 'pub' | 'blog' | 'proposals' | 'contested' | 'movers' | 'vulnerability' | 'rebase' | 'diff';
 
 interface NavigationProps {
   currentTab: TabType;
@@ -20,6 +21,7 @@ interface NavigationProps {
   openProposalsCount: number;
   contestedCount: number;
   isRebaseOpen: boolean;
+  blogPostsCount?: number;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -28,12 +30,20 @@ export const Navigation: React.FC<NavigationProps> = ({
   openProposalsCount,
   contestedCount,
   isRebaseOpen,
+  blogPostsCount,
 }) => {
   const tabs = [
     { id: 'chart' as TabType, label: '15-Position Chart', icon: LayoutGrid },
     { id: 'pitch' as TabType, label: 'Tactical Pitch', icon: Compass, highlight: true },
     { id: 'analytics' as TabType, label: 'Analyst Charts', icon: LineChart },
     { id: 'pub' as TabType, label: 'Pub Mode', icon: Smartphone },
+    {
+      id: 'blog' as TabType,
+      label: 'Clubhouse Blog',
+      icon: BookOpen,
+      badge: blogPostsCount && blogPostsCount > 0 ? blogPostsCount : undefined,
+      badgeColor: 'bg-[#0D6938] text-white',
+    },
     {
       id: 'proposals' as TabType,
       label: 'Debates & Votes',
