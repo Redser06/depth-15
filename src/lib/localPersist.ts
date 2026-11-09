@@ -60,18 +60,13 @@ interface DetachedAudio {
 interface DetachResult {
   posts: BlogPost[];
   extracted: DetachedAudio[];
-  droppedOversized: boolean;
 }
 
-function stripDataAudio(note: VoiceNote, extracted: DetachedAudio[], dropped: { value: boolean }): VoiceNote {
+function stripDataAudio(note: VoiceNote, extracted: DetachedAudio[]): VoiceNote {
   const audioUrl = note.audioUrl;
   if (!audioUrl || !audioUrl.startsWith('data:')) return note;
-  if (audioUrl.length > MAX_VOICE_NOTE_DATA_URL_CHARS) {
-    dropped.value = true;
-    const copy = { ...note };
-    delete copy.audioUrl;
-    return copy;
-  }
+  // Legacy notes were saved with no size cap. Every data URL is moved,
+  // including ones larger than the cap that now applies to new recordings.
   extracted.push({ id: note.id, dataUrl: audioUrl });
   const copy = { ...note };
   delete copy.audioUrl;
@@ -80,14 +75,13 @@ function stripDataAudio(note: VoiceNote, extracted: DetachedAudio[], dropped: { 
 
 export function detachVoiceAudio(posts: BlogPost[]): DetachResult {
   const extracted: DetachedAudio[] = [];
-  const dropped = { value: false };
   const next = posts.map((post) => {
-    const voiceNotes = post.voiceNotes?.map((note) => stripDataAudio(note, extracted, dropped));
+    const voiceNotes = post.voiceNotes?.map((note) => stripDataAudio(note, extracted));
     const comments = post.comments.map((comment) => {
       if (!comment.voiceNote) return comment;
       return {
         ...comment,
-        voiceNote: stripDataAudio(comment.voiceNote, extracted, dropped),
+        voiceNote: stripDataAudio(comment.voiceNote, extracted),
       };
     });
     return {
@@ -96,7 +90,7 @@ export function detachVoiceAudio(posts: BlogPost[]): DetachResult {
       comments,
     };
   });
-  return { posts: next, extracted, droppedOversized: dropped.value };
+  return { posts: next, extracted };
 }
 
 export function collectVoiceNoteIds(posts: BlogPost[]): string[] {
@@ -142,57 +136,85 @@ function blogJsonHasInlineAudio(raw: string): boolean {
   return raw.includes('"audioUrl":"data:') || raw.includes('"audioUrl": "data:');
 }
 
-let strippingBlogAudio = false;
+let blogMigration: Promise<boolean> | null = null;
 
 /**
- * Drop inline data-URL audio from the blog localStorage record and keep the bytes
- * in IndexedDB. Returns true when it actually removed inline audio (quota can recover).
+ * Replace the stored blog JSON with `stripped`, putting `original` back if the
+ * replacement cannot be written. Never leaves the key missing when the original
+ * document can still be stored.
  */
-function emergencyStripBlogAudio(): boolean {
-  if (strippingBlogAudio) return false;
-  strippingBlogAudio = true;
+function replaceStoredBlog(stripped: string, original: string): boolean {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.BLOG_POSTS);
-    if (!raw || !blogJsonHasInlineAudio(raw)) return false;
-
-    let stored = '[]';
-    let extracted: DetachedAudio[] = [];
-    try {
-      const detached = detachVoiceAudio(JSON.parse(raw) as BlogPost[]);
-      stored = JSON.stringify(detached.posts);
-      extracted = detached.extracted;
-    } catch (error) {
-      console.error(error);
-    }
-
-    try {
-      localStorage.removeItem(STORAGE_KEYS.BLOG_POSTS);
-    } catch (error) {
-      console.error(error);
-    }
-    try {
-      localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, stored);
-    } catch (error) {
-      console.error(error);
-      try {
-        localStorage.removeItem(STORAGE_KEYS.BLOG_POSTS);
-      } catch {
-        // The oversized record is already gone; squad writes can proceed.
-      }
-    }
-
-    if (extracted.length > 0) {
-      void storeVoiceAudio(extracted).catch((error) => {
-        console.error(error);
-      });
-    }
+    localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, stripped);
     return true;
-  } finally {
-    strippingBlogAudio = false;
+  } catch (error) {
+    if (!isQuotaError(error)) {
+      console.error(error);
+      return false;
+    }
+  }
+
+  try {
+    localStorage.removeItem(STORAGE_KEYS.BLOG_POSTS);
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+
+  try {
+    localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, stripped);
+    return true;
+  } catch (error) {
+    console.error(error);
+    try {
+      localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, original);
+    } catch (restoreError) {
+      console.error(restoreError);
+    }
+    return false;
   }
 }
 
-export function persistRaw(key: string, value: string): PersistResult {
+/**
+ * Move inline data-URL audio into IndexedDB, then drop it from localStorage.
+ * Concurrent callers share one attempt. Returns true only after IndexedDB has
+ * the bytes and the stripped blog record is the value left in localStorage.
+ */
+function migrateInlineBlogAudio(): Promise<boolean> {
+  if (!blogMigration) {
+    blogMigration = migrateInlineBlogAudioOnce().finally(() => {
+      blogMigration = null;
+    });
+  }
+  return blogMigration;
+}
+
+async function migrateInlineBlogAudioOnce(): Promise<boolean> {
+  const raw = localStorage.getItem(STORAGE_KEYS.BLOG_POSTS);
+  if (!raw || !blogJsonHasInlineAudio(raw)) return false;
+
+  let parsed: BlogPost[];
+  try {
+    parsed = JSON.parse(raw) as BlogPost[];
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+
+  const { posts, extracted } = detachVoiceAudio(parsed);
+  if (extracted.length === 0) return false;
+
+  try {
+    await storeVoiceAudio(extracted);
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+
+  return replaceStoredBlog(JSON.stringify(posts), raw);
+}
+
+export async function persistRaw(key: string, value: string): Promise<PersistResult> {
   try {
     localStorage.setItem(key, value);
     return { ok: true, recovered: false, notice: null };
@@ -201,7 +223,7 @@ export function persistRaw(key: string, value: string): PersistResult {
       console.error(error);
       return { ok: false, recovered: false, notice: NOTICE_FAILED };
     }
-    const freed = emergencyStripBlogAudio();
+    const freed = await migrateInlineBlogAudio();
     if (!freed) {
       console.error(error);
       return { ok: false, recovered: false, notice: NOTICE_FAILED };
@@ -216,23 +238,32 @@ export function persistRaw(key: string, value: string): PersistResult {
   }
 }
 
-export function persistBlogPosts(
+export async function persistBlogPosts(
   posts: BlogPost[],
   onNotice?: (notice: PersistenceNotice) => void
-): PersistResult {
-  const { posts: stored, extracted, droppedOversized } = detachVoiceAudio(posts);
-  const result = persistRaw(STORAGE_KEYS.BLOG_POSTS, JSON.stringify(stored));
-  if (droppedOversized) onNotice?.(VOICE_NOTE_TOO_LARGE_NOTICE);
-  if (extracted.length > 0) {
-    void storeVoiceAudio(extracted).catch((error) => {
-      console.error(error);
-      onNotice?.(NOTICE_AUDIO_STORE);
-    });
+): Promise<PersistResult> {
+  const { posts: stored, extracted } = detachVoiceAudio(posts);
+  if (extracted.length === 0) {
+    return persistRaw(STORAGE_KEYS.BLOG_POSTS, JSON.stringify(stored));
   }
-  if (droppedOversized && !result.notice) {
-    return { ...result, notice: VOICE_NOTE_TOO_LARGE_NOTICE };
+
+  try {
+    await storeVoiceAudio(extracted);
+  } catch (error) {
+    console.error(error);
+    onNotice?.(NOTICE_AUDIO_STORE);
+    // The data URLs stay in the document. Do not run quota recovery here:
+    // that would delete audio IndexedDB never accepted.
+    try {
+      localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, JSON.stringify(posts));
+      return { ok: true, recovered: false, notice: NOTICE_AUDIO_STORE };
+    } catch (writeError) {
+      console.error(writeError);
+      return { ok: false, recovered: false, notice: NOTICE_FAILED };
+    }
   }
-  return result;
+
+  return persistRaw(STORAGE_KEYS.BLOG_POSTS, JSON.stringify(stored));
 }
 
 export function clearStoredVoiceAudio(): Promise<void> {

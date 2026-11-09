@@ -10,7 +10,6 @@ import { generateConsensusDigestPost } from './blogGenerator';
 import {
   STORAGE_KEYS,
   PersistenceNotice,
-  PersistResult,
   VOICE_NOTE_TOO_LARGE_NOTICE,
   attachVoiceAudio,
   clampVoiceAudioUrl,
@@ -254,22 +253,39 @@ export function useDepthStore() {
     return [];
   });
 
-  const publishPersist = (result: PersistResult) => {
-    if (result.notice) setPersistenceNotice(result.notice);
-  };
-
-  // Squad and debate records are written on their own keys. Voice-note audio is
-  // stripped before the blog key is written so a full quota cannot drop them.
+  // Squad records are written on their own keys. Blog audio is moved to IndexedDB
+  // before it is removed from localStorage, so a full quota cannot drop the squad
+  // and a failed audio write cannot drop the recording.
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.STARTER_ASSIGNMENTS, JSON.stringify(starterAssignments)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.STARTER_ASSIGNMENTS, JSON.stringify(starterAssignments)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [starterAssignments]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.POSITION_ORDERS, JSON.stringify(positionOrders)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.POSITION_ORDERS, JSON.stringify(positionOrders)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [positionOrders]);
 
   useEffect(() => {
-    publishPersist(persistBlogPosts(blogPosts, setPersistenceNotice));
+    let active = true;
+    void persistBlogPosts(blogPosts, (notice) => {
+      if (active) setPersistenceNotice(notice);
+    }).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [blogPosts]);
 
   useEffect(() => {
@@ -289,36 +305,78 @@ export function useDepthStore() {
   }, []);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.NEWSLETTER_SUBSCRIBERS, JSON.stringify(newsletterSubscribers)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.NEWSLETTER_SUBSCRIBERS, JSON.stringify(newsletterSubscribers)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [newsletterSubscribers]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.PLAYERS, JSON.stringify(players)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.PLAYERS, JSON.stringify(players)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [players]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.PROPOSALS, JSON.stringify(proposals)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.PROPOSALS, JSON.stringify(proposals)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [proposals]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(snapshots)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(snapshots)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [snapshots]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.ACTIVE_MEMBER, activeMemberId));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.ACTIVE_MEMBER, activeMemberId).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [activeMemberId]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.REBASE, JSON.stringify(rebaseSession)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.REBASE, JSON.stringify(rebaseSession)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [rebaseSession]);
 
   useEffect(() => {
-    publishPersist(persistRaw(STORAGE_KEYS.DARK_MODE, JSON.stringify(darkMode)));
+    let active = true;
+    void persistRaw(STORAGE_KEYS.DARK_MODE, JSON.stringify(darkMode)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
     if (darkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
     }
+    return () => {
+      active = false;
+    };
   }, [darkMode]);
 
   const activeMember = DEFAULT_MEMBERS.find(m => m.id === activeMemberId) ?? DEFAULT_MEMBERS[0]!;

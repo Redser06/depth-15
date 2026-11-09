@@ -279,6 +279,7 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
   const audioSettleRef = useRef<Promise<string | undefined>>(Promise.resolve(undefined));
   // undefined = no captured audio, null = capture is still encoding.
   const audioReadyRef = useRef<string | undefined | null>(undefined);
+  const audioGenerationRef = useRef(0);
 
   const cleanupRecording = () => {
     if (timerRef.current !== null) {
@@ -310,12 +311,14 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
   useEffect(() => {
     return () => {
       startTokenRef.current += 1;
+      audioGenerationRef.current += 1;
       cleanupRecording();
     };
   }, []);
 
   const startRecording = async () => {
     const token = ++startTokenRef.current;
+    const generation = ++audioGenerationRef.current;
     setMicNotice(null);
     setDurationSeconds(0);
     setIsEncodingAudio(false);
@@ -402,6 +405,11 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
           resolveAudio = resolve;
         });
         const finishAudio = (url: string | undefined) => {
+          if (generation !== audioGenerationRef.current) {
+            resolveAudio(undefined);
+            resolveAudio = () => {};
+            return;
+          }
           audioReadyRef.current = url;
           resolveAudio(url);
           resolveAudio = () => {};
@@ -497,8 +505,10 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
   };
 
   const handleSave = () => {
+    const generation = audioGenerationRef.current;
     if (audioReadyRef.current === null) {
       void audioSettleRef.current.then((audioUrl) => {
+        if (generation !== audioGenerationRef.current) return;
         publishVoiceNote(audioUrl);
       });
       return;
@@ -508,6 +518,7 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
 
   const handleReset = () => {
     startTokenRef.current += 1;
+    audioGenerationRef.current += 1;
     cleanupRecording();
     audioReadyRef.current = undefined;
     audioSettleRef.current = Promise.resolve(undefined);

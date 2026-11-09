@@ -177,12 +177,98 @@ describe('voice note persistence', () => {
     hook.unmount();
   });
 
-  it('drops an oversized data URL before it can enter the squad save', () => {
-    const posts = voiceNoteBlog(`data:audio/webm;base64,${'B'.repeat(MAX_VOICE_NOTE_DATA_URL_CHARS + 20)}`);
-    const detached = detachVoiceAudio(posts);
-    expect(detached.droppedOversized).toBe(true);
-    expect(detached.extracted).toHaveLength(0);
+  it('extracts oversized legacy audio instead of dropping it', () => {
+    const audioUrl = `data:audio/webm;base64,${'B'.repeat(MAX_VOICE_NOTE_DATA_URL_CHARS + 20)}`;
+    const detached = detachVoiceAudio(voiceNoteBlog(audioUrl));
+    expect(detached.extracted).toEqual([{ id: 'vn-quota', dataUrl: audioUrl }]);
     expect(detached.posts[0]?.voiceNotes?.[0]?.audioUrl).toBeUndefined();
     expect(detached.posts[0]?.voiceNotes?.[0]?.transcript).toBe('Keep this transcript');
+  });
+
+  it('refuses a new voice note above the data URL cap and keeps the transcript', async () => {
+    localStorage.clear();
+    const hook = renderHook(() => useDepthStore());
+    const postId = hook.result.current.blogPosts[0]!.id;
+    const audioUrl = `data:audio/webm;base64,${'D'.repeat(MAX_VOICE_NOTE_DATA_URL_CHARS)}`;
+
+    act(() => {
+      hook.result.current.addBlogVoiceNote(postId, {
+        durationSeconds: 8,
+        transcript: 'cap this',
+        audioUrl,
+      });
+    });
+
+    const note = hook.result.current.blogPosts
+      .find((post) => post.id === postId)
+      ?.voiceNotes?.find((entry) => entry.transcript === 'cap this');
+    expect(note?.audioUrl).toBeUndefined();
+    expect(hook.result.current.persistenceNotice?.message).toMatch(/too large to store/i);
+
+    await waitFor(() => {
+      const stored = localStorage.getItem(STORAGE_KEYS.BLOG_POSTS) ?? '';
+      expect(stored).toContain('cap this');
+      expect(stored).not.toContain(audioUrl);
+    });
+    hook.unmount();
+  });
+
+  it('does not replace an unreadable blog record with an empty list', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const quota = 1_000;
+    const storage = installQuotaStorage(quota);
+    const corrupt = `not-json "audioUrl":"data:audio/webm;base64,${'Z'.repeat(5_000)}`;
+    storage.seed(STORAGE_KEYS.BLOG_POSTS, corrupt);
+
+    const hook = renderHook(() => useDepthStore());
+    await waitFor(() => {
+      expect(hook.result.current.persistenceNotice?.level).toBe('error');
+    });
+    expect(localStorage.getItem(STORAGE_KEYS.BLOG_POSTS)).toBe(corrupt);
+    hook.unmount();
+  });
+
+  it('puts the original blog back when the stripped copy cannot be saved', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const audioUrl = 'data:audio/webm;base64,QUJD';
+    const original = JSON.stringify(voiceNoteBlog(audioUrl));
+    const memory = new Map<string, string>();
+    const api: Storage = {
+      get length() {
+        return memory.size;
+      },
+      clear() {
+        memory.clear();
+      },
+      key(index: number) {
+        return [...memory.keys()][index] ?? null;
+      },
+      getItem(key: string) {
+        return memory.has(key) ? memory.get(key)! : null;
+      },
+      setItem(key: string, value: string) {
+        const stringValue = String(value);
+        if (key === STORAGE_KEYS.BLOG_POSTS && !stringValue.includes('data:audio')) {
+          throw new DOMException('quota', 'QuotaExceededError');
+        }
+        memory.set(key, stringValue);
+      },
+      removeItem(key: string) {
+        memory.delete(key);
+      },
+    };
+    const descriptor = { configurable: true, value: api };
+    Object.defineProperty(window, 'localStorage', descriptor);
+    Object.defineProperty(globalThis, 'localStorage', descriptor);
+    memory.set(STORAGE_KEYS.BLOG_POSTS, original);
+
+    const hook = renderHook(() => useDepthStore());
+    await waitFor(() => {
+      expect(hook.result.current.persistenceNotice?.level).toBe('error');
+    });
+    const stored = localStorage.getItem(STORAGE_KEYS.BLOG_POSTS);
+    expect(stored).toContain('data:audio');
+    expect(stored).toContain('Keep this transcript');
+    hook.unmount();
   });
 });

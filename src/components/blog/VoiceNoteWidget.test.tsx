@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { VoiceNoteRecorder } from './VoiceNoteWidget';
+import { MAX_VOICE_NOTE_BLOB_BYTES } from '../../lib/voiceNoteLimits';
+
+function invokeOnClick(element: HTMLElement) {
+  const propsKey = Object.keys(element).find((key) => key.startsWith('__reactProps'));
+  if (!propsKey) throw new Error('React props not found on element');
+  const props = (element as unknown as Record<string, { onClick?: () => void }>)[propsKey];
+  if (!props?.onClick) throw new Error('onClick missing');
+  props.onClick();
+}
 
 class RecordingDouble {
   state: RecordingState = 'inactive';
@@ -146,19 +155,124 @@ describe('VoiceNoteRecorder', () => {
     fireEvent.click(preparing);
     expect(onSave).not.toHaveBeenCalled();
 
+    // The button is disabled, so invoke the handler directly. Removing the wait
+    // branch would post immediately with no audio URL.
+    invokeOnClick(preparing);
+    expect(onSave).not.toHaveBeenCalled();
+
     await act(async () => {
       pendingReader!.result = 'data:audio/webm;base64,QUJD';
       pendingReader!.onloadend?.();
+      await Promise.resolve();
     });
-
-    const post = screen.getByRole('button', { name: /Post Voice Note/i });
-    expect((post as HTMLButtonElement).disabled).toBe(false);
-    fireEvent.click(post);
 
     expect(onSave).toHaveBeenCalledTimes(1);
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         audioUrl: 'data:audio/webm;base64,QUJD',
+      })
+    );
+  });
+
+  it('does not attach a discarded recording when its conversion finishes later', async () => {
+    const onSave = vi.fn();
+    let pendingReader: {
+      result: string | null;
+      onloadend: (() => void) | null;
+    } | null = null;
+
+    class DeferredReader {
+      result: string | null = null;
+      onloadend: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      readAsDataURL() {
+        pendingReader = this;
+      }
+    }
+
+    vi.stubGlobal('MediaRecorder', RecordingDouble);
+    vi.stubGlobal('FileReader', DeferredReader);
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn(async () => ({
+          getTracks: () => [{ stop: vi.fn() } as unknown as MediaStreamTrack],
+        })),
+      },
+    });
+
+    render(<VoiceNoteRecorder authorName="Conor Redmond" onSaveVoiceNote={onSave} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Start Recording/i }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Stop/i }));
+    fireEvent.click(screen.getByTitle('Discard voice note'));
+
+    await act(async () => {
+      pendingReader!.result = 'data:audio/webm;base64,DISCARDED';
+      pendingReader!.onloadend?.();
+      await Promise.resolve();
+    });
+    expect(onSave).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByPlaceholderText(/Speak into your mic/i), {
+      target: { value: 'Typed after discard' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Post Voice Note/i }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transcript: 'Typed after discard',
+        audioUrl: undefined,
+      })
+    );
+  });
+
+  it('does not encode a recording past the byte cap', async () => {
+    class OversizeRecorder extends RecordingDouble {
+      override stop() {
+        this.ondataavailable?.({
+          data: new Blob([new Uint8Array(MAX_VOICE_NOTE_BLOB_BYTES + 1)]),
+        });
+        this.state = 'inactive';
+        this.onstop?.();
+      }
+    }
+
+    vi.stubGlobal('MediaRecorder', OversizeRecorder);
+    vi.stubGlobal(
+      'FileReader',
+      class {
+        readAsDataURL() {
+          throw new Error('oversized audio should not be encoded');
+        }
+      }
+    );
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn(async () => ({
+          getTracks: () => [{ stop: vi.fn() } as unknown as MediaStreamTrack],
+        })),
+      },
+    });
+
+    const onSave = vi.fn();
+    render(<VoiceNoteRecorder authorName="Conor Redmond" onSaveVoiceNote={onSave} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Start Recording/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Stop/i }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(screen.getByText(/too large to store/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Post Voice Note/i }));
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        audioUrl: undefined,
       })
     );
   });
