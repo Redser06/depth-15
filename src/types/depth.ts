@@ -204,7 +204,7 @@ export interface VoiceNote {
   authorName: string;
   authorRole?: string;
   durationSeconds: number;
-  audioUrl?: string; // base64 data URL recorded via MediaRecorder
+  audioUrl?: string; // Playback URL. Recorded data URLs are stored in IndexedDB, not localStorage.
   transcript: string;
   createdAt: string;
 }
