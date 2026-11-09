@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { VoiceNote } from '../../types/depth';
+import { MAX_VOICE_NOTE_BLOB_BYTES, MAX_VOICE_NOTE_SECONDS } from '../../lib/voiceNoteLimits';
 import {
   Mic,
   Square,
@@ -262,15 +263,22 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
 }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [durationSeconds, setDurationSeconds] = useState(0);
-  const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | undefined>();
   const [transcript, setTranscript] = useState('');
   const [micNotice, setMicNotice] = useState<string | null>(null);
+
+  const [isEncodingAudio, setIsEncodingAudio] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const speechRecRef = useRef<SpeechRecognitionInstance | null>(null);
+  const startTokenRef = useRef(0);
+  const elapsedRef = useRef(0);
+  const overLimitRef = useRef(false);
+  const audioSettleRef = useRef<Promise<string | undefined>>(Promise.resolve(undefined));
+  // undefined = no captured audio, null = capture is still encoding.
+  const audioReadyRef = useRef<string | undefined | null>(undefined);
 
   const cleanupRecording = () => {
     if (timerRef.current !== null) {
@@ -301,19 +309,34 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
 
   useEffect(() => {
     return () => {
+      startTokenRef.current += 1;
       cleanupRecording();
     };
   }, []);
 
   const startRecording = async () => {
+    const token = ++startTokenRef.current;
     setMicNotice(null);
-    setRecordedAudioUrl(undefined);
     setDurationSeconds(0);
+    setIsEncodingAudio(false);
     setIsRecording(true);
+    elapsedRef.current = 0;
+    overLimitRef.current = false;
+    audioReadyRef.current = undefined;
+    audioSettleRef.current = Promise.resolve(undefined);
 
     // Start elapsed timer
     timerRef.current = window.setInterval(() => {
-      setDurationSeconds((prev) => prev + 1);
+      elapsedRef.current += 1;
+      if (elapsedRef.current >= MAX_VOICE_NOTE_SECONDS) {
+        setDurationSeconds(MAX_VOICE_NOTE_SECONDS);
+        setMicNotice(
+          `Voice notes are limited to ${MAX_VOICE_NOTE_SECONDS} seconds so they cannot fill browser storage.`
+        );
+        stopRecording();
+        return;
+      }
+      setDurationSeconds(elapsedRef.current);
     }, 1000);
 
     // Start Web Speech Recognition if available for live auto-transcription
@@ -347,48 +370,94 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
       }
     }
 
-    // Start MediaRecorder for real microphone capture if available
+    // Start MediaRecorder for real microphone capture if available.
+    // Permission can outlive a cancelled start: if Stop already won, release
+    // the tracks and never call MediaRecorder.start.
     if (
       typeof navigator !== 'undefined' &&
       navigator.mediaDevices &&
       typeof navigator.mediaDevices.getUserMedia === 'function' &&
       typeof MediaRecorder !== 'undefined'
     ) {
+      let stream: MediaStream | null = null;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        if (token !== startTokenRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         streamRef.current = stream;
         chunksRef.current = [];
         const recorder = new MediaRecorder(stream);
+        if (token !== startTokenRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          streamRef.current = null;
+          return;
+        }
         mediaRecorderRef.current = recorder;
 
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) {
-            chunksRef.current.push(e.data);
+        let resolveAudio: (url: string | undefined) => void = () => {};
+        audioReadyRef.current = null;
+        audioSettleRef.current = new Promise((resolve) => {
+          resolveAudio = resolve;
+        });
+        const finishAudio = (url: string | undefined) => {
+          audioReadyRef.current = url;
+          resolveAudio(url);
+          resolveAudio = () => {};
+        };
+
+        recorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            chunksRef.current.push(event.data);
+          }
+          const total = chunksRef.current.reduce((sum, chunk) => sum + chunk.size, 0);
+          if (total > MAX_VOICE_NOTE_BLOB_BYTES && !overLimitRef.current) {
+            overLimitRef.current = true;
+            setMicNotice('This voice note is too large to store. The transcript was kept.');
+            window.setTimeout(() => stopRecording(), 0);
           }
         };
 
         recorder.onstop = () => {
-          if (chunksRef.current.length > 0) {
-            const blob = new Blob(chunksRef.current, {
-              type: recorder.mimeType || 'audio/webm',
-            });
-            const reader = new FileReader();
-            reader.onloadend = () => {
-              if (typeof reader.result === 'string') {
-                setRecordedAudioUrl(reader.result);
-              }
-            };
-            reader.readAsDataURL(blob);
+          if (chunksRef.current.length === 0) {
+            setIsEncodingAudio(false);
+            finishAudio(undefined);
+            return;
           }
+          const blob = new Blob(chunksRef.current, {
+            type: recorder.mimeType || 'audio/webm',
+          });
+          if (blob.size > MAX_VOICE_NOTE_BLOB_BYTES) {
+            setIsEncodingAudio(false);
+            setMicNotice('This voice note is too large to store. The transcript was kept.');
+            finishAudio(undefined);
+            return;
+          }
+          setIsEncodingAudio(true);
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const url = typeof reader.result === 'string' ? reader.result : undefined;
+            setIsEncodingAudio(false);
+            finishAudio(url);
+          };
+          reader.onerror = () => {
+            setIsEncodingAudio(false);
+            setMicNotice('Could not read the recording. The transcript was kept.');
+            finishAudio(undefined);
+          };
+          reader.readAsDataURL(blob);
         };
 
         recorder.start(250);
       } catch {
+        stream?.getTracks().forEach((track) => track.stop());
+        if (token !== startTokenRef.current) return;
         setMicNotice(
           'Microphone permission unavailable—recording timed voice memo with spoken transcript synthesis.'
         );
       }
-    } else {
+    } else if (token === startTokenRef.current) {
       setMicNotice(
         'Browser audio capture unavailable—recording timed voice memo with spoken transcript synthesis.'
       );
@@ -396,11 +465,15 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
   };
 
   const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      setIsEncodingAudio(true);
+    }
+    startTokenRef.current += 1;
     cleanupRecording();
     setDurationSeconds((prev) => Math.max(3, prev));
   };
 
-  const handleSave = () => {
+  const publishVoiceNote = (audioUrl: string | undefined) => {
     const cleanTranscript =
       transcript.trim() ||
       `${authorName} recorded a ${Math.max(4, durationSeconds || 8)}-second Clubhouse voice note.`;
@@ -411,21 +484,36 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
 
     onSaveVoiceNote({
       durationSeconds: finalDuration,
-      audioUrl: recordedAudioUrl,
+      audioUrl,
       transcript: cleanTranscript,
     });
 
+    audioReadyRef.current = undefined;
+    audioSettleRef.current = Promise.resolve(undefined);
     setTranscript('');
     setDurationSeconds(0);
-    setRecordedAudioUrl(undefined);
+    setIsEncodingAudio(false);
     setMicNotice(null);
   };
 
+  const handleSave = () => {
+    if (audioReadyRef.current === null) {
+      void audioSettleRef.current.then((audioUrl) => {
+        publishVoiceNote(audioUrl);
+      });
+      return;
+    }
+    publishVoiceNote(audioReadyRef.current);
+  };
+
   const handleReset = () => {
+    startTokenRef.current += 1;
     cleanupRecording();
+    audioReadyRef.current = undefined;
+    audioSettleRef.current = Promise.resolve(undefined);
+    setIsEncodingAudio(false);
     setTranscript('');
     setDurationSeconds(0);
-    setRecordedAudioUrl(undefined);
     setMicNotice(null);
   };
 
@@ -518,12 +606,12 @@ export const VoiceNoteRecorder: React.FC<VoiceNoteRecorderProps> = ({
 
           <button
             type="button"
-            disabled={isRecording || (durationSeconds === 0 && !transcript.trim())}
+            disabled={isRecording || isEncodingAudio || (durationSeconds === 0 && !transcript.trim())}
             onClick={handleSave}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#0D6938] hover:bg-[#0a522c] disabled:opacity-40 text-white transition cursor-pointer"
           >
             <Check className="w-3.5 h-3.5" />
-            <span>Post Voice Note</span>
+            <span>{isEncodingAudio ? 'Preparing audio…' : 'Post Voice Note'}</span>
           </button>
         </div>
       </div>
