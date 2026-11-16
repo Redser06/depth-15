@@ -7,19 +7,18 @@ import { evaluateProposal } from './consensusEngine';
 import { resolveStartingXV } from './selectionRules';
 import { groupPlayersByPosition } from './depthCalc';
 import { generateConsensusDigestPost } from './blogGenerator';
-
-const STORAGE_KEYS = {
-  PLAYERS: 'depth15_players_v1',
-  PROPOSALS: 'depth15_proposals_v1',
-  SNAPSHOTS: 'depth15_snapshots_v1',
-  ACTIVE_MEMBER: 'depth15_active_member_v1',
-  REBASE: 'depth15_rebase_v1',
-  DARK_MODE: 'depth15_dark_mode_v1',
-  STARTER_ASSIGNMENTS: 'depth15_starters_v1',
-  POSITION_ORDERS: 'depth15_orders_v1',
-  BLOG_POSTS: 'depth15_blog_posts_v1',
-  NEWSLETTER_SUBSCRIBERS: 'depth15_newsletter_v1',
-};
+import {
+  STORAGE_KEYS,
+  PersistenceNotice,
+  VOICE_NOTE_TOO_LARGE_NOTICE,
+  attachVoiceAudio,
+  clampVoiceAudioUrl,
+  clearStoredVoiceAudio,
+  collectVoiceNoteIds,
+  loadVoiceAudio,
+  persistBlogPosts,
+  persistRaw,
+} from './localPersist';
 
 // Seed initial realistic debate proposals so app is immediately rich with live pub discussion
 const INITIAL_PROPOSALS: Proposal[] = [
@@ -241,6 +240,8 @@ export function useDepthStore() {
     return INITIAL_BLOG_POSTS;
   });
 
+  const [persistenceNotice, setPersistenceNotice] = useState<PersistenceNotice | null>(null);
+
   // Newsletter subscribers state
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<string[]>(() => {
     try {
@@ -252,91 +253,130 @@ export function useDepthStore() {
     return [];
   });
 
-  // Sync starter assignments & position orders
+  // Squad records are written on their own keys. Blog audio is moved to IndexedDB
+  // before it is removed from localStorage, so a full quota cannot drop the squad
+  // and a failed audio write cannot drop the recording.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.STARTER_ASSIGNMENTS, JSON.stringify(starterAssignments));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.STARTER_ASSIGNMENTS, JSON.stringify(starterAssignments)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [starterAssignments]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.POSITION_ORDERS, JSON.stringify(positionOrders));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.POSITION_ORDERS, JSON.stringify(positionOrders)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [positionOrders]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.BLOG_POSTS, JSON.stringify(blogPosts));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistBlogPosts(blogPosts, (notice) => {
+      if (active) setPersistenceNotice(notice);
+    }).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [blogPosts]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.NEWSLETTER_SUBSCRIBERS, JSON.stringify(newsletterSubscribers));
-    } catch (e) {
-      console.error(e);
-    }
+    let cancelled = false;
+    const ids = collectVoiceNoteIds(blogPosts);
+    if (ids.length === 0) return;
+    void loadVoiceAudio(ids).then((audio) => {
+      if (cancelled) return;
+      setBlogPosts((current) => attachVoiceAudio(current, audio));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Reload audio once from IndexedDB. Notes recorded in this session already
+    // carry their playback URL in memory.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void persistRaw(STORAGE_KEYS.NEWSLETTER_SUBSCRIBERS, JSON.stringify(newsletterSubscribers)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [newsletterSubscribers]);
 
-  // Sync with localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.PLAYERS, JSON.stringify(players));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.PLAYERS, JSON.stringify(players)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [players]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.PROPOSALS, JSON.stringify(proposals));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.PROPOSALS, JSON.stringify(proposals)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [proposals]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(snapshots));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.SNAPSHOTS, JSON.stringify(snapshots)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [snapshots]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_MEMBER, activeMemberId);
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.ACTIVE_MEMBER, activeMemberId).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [activeMemberId]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.REBASE, JSON.stringify(rebaseSession));
-    } catch (e) {
-      console.error(e);
-    }
+    let active = true;
+    void persistRaw(STORAGE_KEYS.REBASE, JSON.stringify(rebaseSession)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    return () => {
+      active = false;
+    };
   }, [rebaseSession]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.DARK_MODE, JSON.stringify(darkMode));
-      if (darkMode) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    } catch (e) {
-      console.error(e);
+    let active = true;
+    void persistRaw(STORAGE_KEYS.DARK_MODE, JSON.stringify(darkMode)).then((result) => {
+      if (active && result.notice) setPersistenceNotice(result.notice);
+    });
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
     }
+    return () => {
+      active = false;
+    };
   }, [darkMode]);
 
   const activeMember = DEFAULT_MEMBERS.find(m => m.id === activeMemberId) ?? DEFAULT_MEMBERS[0]!;
@@ -885,6 +925,9 @@ export function useDepthStore() {
     const readTimeMinutes = Math.max(2, Math.round(wordCount / 160));
     const authorRole = activeMember.role === 'owner' ? 'Lead Tactical Analyst' : 'Clubhouse Columnist';
 
+    const stagedAudio = data.voiceNote ? clampVoiceAudioUrl(data.voiceNote.audioUrl) : null;
+    if (stagedAudio?.dropped) setPersistenceNotice(VOICE_NOTE_TOO_LARGE_NOTICE);
+
     const initialVoiceNotes: VoiceNote[] = data.voiceNote
       ? [
           {
@@ -893,7 +936,7 @@ export function useDepthStore() {
             authorName: activeMember.name,
             authorRole,
             durationSeconds: data.voiceNote.durationSeconds,
-            audioUrl: data.voiceNote.audioUrl,
+            audioUrl: stagedAudio?.url,
             transcript: data.voiceNote.transcript,
             createdAt: new Date().toISOString(),
           },
@@ -964,13 +1007,16 @@ export function useDepthStore() {
     audioUrl?: string;
     transcript: string;
   }) => {
+    const stagedAudio = clampVoiceAudioUrl(note.audioUrl);
+    if (stagedAudio.dropped) setPersistenceNotice(VOICE_NOTE_TOO_LARGE_NOTICE);
+
     const newVoiceNote: VoiceNote = {
       id: `vn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       authorId: activeMember.id,
       authorName: activeMember.name,
       authorRole: activeMember.role === 'owner' ? 'Lead Tactical Analyst' : 'Clubhouse Member',
       durationSeconds: note.durationSeconds,
-      audioUrl: note.audioUrl,
+      audioUrl: stagedAudio.url,
       transcript: note.transcript.trim(),
       createdAt: new Date().toISOString(),
     };
@@ -994,13 +1040,16 @@ export function useDepthStore() {
   ) => {
     const clean = text.trim() || voiceNote?.transcript.trim() || '';
     if (!clean && !voiceNote) return;
+    const stagedAudio = voiceNote ? clampVoiceAudioUrl(voiceNote.audioUrl) : null;
+    if (stagedAudio?.dropped) setPersistenceNotice(VOICE_NOTE_TOO_LARGE_NOTICE);
+
     const attachedVoiceNote: VoiceNote | undefined = voiceNote
       ? {
           id: `vn-c-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           authorId: activeMember.id,
           authorName: activeMember.name,
           durationSeconds: voiceNote.durationSeconds,
-          audioUrl: voiceNote.audioUrl,
+          audioUrl: stagedAudio?.url,
           transcript: voiceNote.transcript.trim(),
           createdAt: new Date().toISOString(),
         }
@@ -1045,6 +1094,7 @@ export function useDepthStore() {
         // ignore
       }
     });
+    void clearStoredVoiceAudio();
     setPlayers(BASELINE_PLAYERS);
     setProposals(INITIAL_PROPOSALS);
     setSnapshots([IMMUTABLE_2025_SNAPSHOT]);
@@ -1066,6 +1116,8 @@ export function useDepthStore() {
 
   return {
     players,
+    persistenceNotice,
+    dismissPersistenceNotice: () => setPersistenceNotice(null),
     proposals,
     snapshots,
     blogPosts,

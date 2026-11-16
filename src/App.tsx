@@ -21,7 +21,7 @@ import { BlogView } from './components/blog/BlogView';
 import { TransferPlayerModal } from './components/modals/TransferPlayerModal';
 import { AddBreakthroughPlayerModal } from './components/modals/AddBreakthroughPlayerModal';
 import { PlayerEntry, Position, Proposal, Province, PROVINCES } from './types/depth';
-import { Search, RotateCcw, ArrowRightLeft, UserPlus, BookOpen, ArrowRight } from 'lucide-react';
+import { Search, RotateCcw, ArrowRightLeft, UserPlus, BookOpen, ArrowRight, AlertCircle } from 'lucide-react';
 
 export const App: React.FC = () => {
   const store = useDepthStore();
@@ -160,6 +160,27 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {store.persistenceNotice && (
+          <div
+            role="alert"
+            className={`rounded-2xl border px-4 py-3 flex items-start gap-3 ${
+              store.persistenceNotice.level === 'error'
+                ? 'border-red-300 bg-red-50 text-red-950 dark:border-red-800 dark:bg-red-950/50 dark:text-red-100'
+                : 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100'
+            }`}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+            <p className="text-sm font-medium flex-1">{store.persistenceNotice.message}</p>
+            <button
+              type="button"
+              onClick={store.dismissPersistenceNotice}
+              className="text-xs font-bold underline shrink-0 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* CHART VIEW */}
         {currentTab === 'chart' && (
           <div className="space-y-6 animate-in fade-in duration-200">
